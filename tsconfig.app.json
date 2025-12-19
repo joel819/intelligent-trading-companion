@@ -20,6 +20,11 @@
     "noUnusedParameters": false,
     "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
+    "types": [
+      "react",
+      "react-dom",
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
       "@/*": [
