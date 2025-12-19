@@ -1,4 +1,4 @@
-import { Bell, User, Wifi, WifiOff } from 'lucide-react';
+import { Bell, User, Wifi, WifiOff, Search, Settings, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -8,7 +8,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { Account, Notification } from '@/types/trading';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/api/client';
 
 interface HeaderProps {
   accounts: Account[];
@@ -16,7 +27,6 @@ interface HeaderProps {
   onAccountChange: (id: string) => void;
   notifications: Notification[];
   onNotificationsClick: () => void;
-  isConnected?: boolean;
 }
 
 export const Header = ({
@@ -25,14 +35,25 @@ export const Header = ({
   onAccountChange,
   notifications,
   onNotificationsClick,
-  isConnected = true,
 }: HeaderProps) => {
   const unreadCount = notifications.filter(n => !n.read).length;
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
 
+  // Simple latency check
+  const { data: health, isLoading, isError } = useQuery({
+    queryKey: ['health'],
+    queryFn: async () => {
+      const start = performance.now();
+      // We can use status as a ping
+      await api.bot.getStatus();
+      return Math.round(performance.now() - start);
+    },
+    refetchInterval: 5000,
+  });
+
   return (
     <header className="fixed top-0 right-0 left-16 md:left-56 z-30 h-16 bg-card/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 md:px-6">
-      {/* Left: Account Selector */}
+      {/* Left: Account Selector and Search */}
       <div className="flex items-center gap-4">
         <Select value={selectedAccountId} onValueChange={onAccountChange}>
           <SelectTrigger className="w-[180px] bg-secondary border-border">
@@ -62,9 +83,8 @@ export const Header = ({
             </div>
             <div>
               <span className="text-muted-foreground">Equity:</span>
-              <span className={`ml-2 font-mono font-semibold ${
-                selectedAccount.equity >= selectedAccount.balance ? 'text-success' : 'text-destructive'
-              }`}>
+              <span className={`ml-2 font-mono font-semibold ${selectedAccount.equity >= selectedAccount.balance ? 'text-success' : 'text-destructive'
+                }`}>
                 ${selectedAccount.equity.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -76,23 +96,27 @@ export const Header = ({
       <div className="flex items-center gap-3">
         {/* Connection Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary">
-          {isConnected ? (
-            <>
-              <Wifi className="w-4 h-4 text-success" />
-              <span className="text-xs font-medium text-success hidden sm:inline">Connected</span>
-            </>
-          ) : (
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : isError ? (
             <>
               <WifiOff className="w-4 h-4 text-destructive" />
               <span className="text-xs font-medium text-destructive hidden sm:inline">Offline</span>
+            </>
+          ) : (
+            <>
+              <Wifi className="w-4 h-4 text-success" />
+              <span className={`text-xs font-medium hidden sm:inline ${health && health > 200 ? "text-warning" : "text-success"}`}>
+                {health}ms
+              </span>
             </>
           )}
         </div>
 
         {/* Notifications */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="relative"
           onClick={onNotificationsClick}
         >

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import type { StrategySettings as StrategySettingsType } from '@/types/trading';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/api/client';
 
 const defaultSettings: StrategySettingsType = {
   gridSize: 10,
@@ -22,12 +23,27 @@ export const StrategySettings = () => {
   const [settings, setSettings] = useState<StrategySettingsType>(defaultSettings);
   const { toast } = useToast();
 
-  const handleSave = () => {
-    // This would send to API: POST /bot/settings
-    toast({
-      title: "Settings Saved",
-      description: "Strategy settings have been updated successfully.",
-    });
+  useEffect(() => {
+    // Load settings from backend
+    api.settings.get().then(data => {
+      if (data) setSettings(data);
+    }).catch(err => console.error("Failed to load settings", err));
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      await api.settings.update(settings);
+      toast({
+        title: "Settings Saved",
+        description: "Strategy settings have been updated successfully.",
+      });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: "Failed to save settings.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleReset = () => {
@@ -58,7 +74,7 @@ export const StrategySettings = () => {
         {/* Grid Trading Settings */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Grid Trading</h4>
-          
+
           <div className="space-y-2">
             <Label htmlFor="gridSize">Grid Size (points)</Label>
             <Input
@@ -85,7 +101,7 @@ export const StrategySettings = () => {
         {/* Risk Management */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Risk Management</h4>
-          
+
           <div className="space-y-3">
             <div className="flex justify-between">
               <Label>Risk per Trade (%)</Label>
@@ -130,7 +146,7 @@ export const StrategySettings = () => {
         {/* ML Settings */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">ML Configuration</h4>
-          
+
           <div className="space-y-3">
             <div className="flex justify-between">
               <Label>Confidence Threshold</Label>
@@ -152,7 +168,7 @@ export const StrategySettings = () => {
         {/* Trade Limits */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Trade Limits</h4>
-          
+
           <div className="space-y-2">
             <Label htmlFor="stopLoss">Stop Loss (points)</Label>
             <Input

@@ -9,7 +9,8 @@ import { LogsStream } from '@/components/dashboard/LogsStream';
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 import { AccountsList } from '@/components/accounts/AccountsList';
-import { useMockData } from '@/hooks/useMockData';
+// import { useMockData } from '@/hooks/useMockData';
+import { useTradingData } from '@/hooks/useTradingData';
 import { Wallet, TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,7 +28,7 @@ const Index = () => {
     toggleBot,
     notifications,
     markNotificationRead,
-  } = useMockData();
+  } = useTradingData();
 
   const handleNotificationsClick = () => {
     setActiveTab('notifications');
@@ -38,7 +39,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-      
+
       <div className="pl-16 md:pl-56">
         <Header
           accounts={accounts}

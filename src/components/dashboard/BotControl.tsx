@@ -1,11 +1,13 @@
-import { Power, Clock, Activity, Zap } from 'lucide-react';
+import { Power, Clock, Activity, Zap, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { BotStatus } from '@/types/trading';
 import { cn } from '@/lib/utils';
+import { api } from '@/api/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface BotControlProps {
   status: BotStatus;
-  onToggle: () => void;
+  onToggle: () => void; // Kept for compatibility if wrapper needed, but we might call API directly
 }
 
 const formatUptime = (seconds: number): string => {
@@ -15,8 +17,39 @@ const formatUptime = (seconds: number): string => {
 };
 
 export const BotControl = ({ status, onToggle }: BotControlProps) => {
+  const { toast } = useToast();
+
+  const handlePanic = async () => {
+    try {
+      await api.bot.toggle('panic');
+      toast({
+        title: "PANIC STOP TRIGGERED",
+        description: "Bot stopped and all positions closed.",
+        variant: "destructive"
+      });
+      // Force refresh or state update here if needed (via React Query usually)
+      onToggle();
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to trigger panic stop", variant: "destructive" });
+    }
+  };
+
+  const handleToggle = async () => {
+    const command = status.isRunning ? 'stop' : 'start';
+    try {
+      await api.bot.toggle(command);
+      toast({
+        title: status.isRunning ? "Bot Stopped" : "Bot Started",
+        description: `Trading engine has been ${status.isRunning ? 'stopped' : 'started'}.`,
+      });
+      onToggle();
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to toggle bot", variant: "destructive" });
+    }
+  };
+
   return (
-    <div className="glass-card p-5 animate-fade-in">
+    <div className="glass-card p-5 animate-fade-in relative overflow-hidden">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-foreground">Bot Control</h3>
         <div className={cn(
@@ -66,15 +99,29 @@ export const BotControl = ({ status, onToggle }: BotControlProps) => {
         </div>
       </div>
 
-      <Button
-        onClick={onToggle}
-        variant={status.isRunning ? "destructive" : "success"}
-        className="w-full"
-        size="lg"
-      >
-        <Power className="w-4 h-4 mr-2" />
-        {status.isRunning ? 'Stop Bot' : 'Start Bot'}
-      </Button>
+      <div className="flex flex-col gap-3">
+        <Button
+          onClick={handleToggle}
+          variant={status.isRunning ? "destructive" : "success"}
+          className="w-full"
+          size="lg"
+        >
+          <Power className="w-4 h-4 mr-2" />
+          {status.isRunning ? 'Stop Bot' : 'Start Bot'}
+        </Button>
+
+        {status.isRunning && (
+          <Button
+            onClick={handlePanic}
+            variant="destructive"
+            className="w-full animate-pulse font-bold tracking-wider"
+            size="sm"
+          >
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            PANIC STOP
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
