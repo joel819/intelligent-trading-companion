@@ -18,8 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Account, Notification } from '@/types/trading';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/api/client';
+import { useDeriv } from '@/hooks/useDeriv';
 
 interface HeaderProps {
   accounts: Account[];
@@ -38,18 +37,7 @@ export const Header = ({
 }: HeaderProps) => {
   const unreadCount = notifications.filter(n => !n.read).length;
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-
-  // Simple latency check
-  const { data: health, isLoading, isError } = useQuery({
-    queryKey: ['health'],
-    queryFn: async () => {
-      const start = performance.now();
-      // We can use status as a ping
-      await api.bot.getStatus();
-      return Math.round(performance.now() - start);
-    },
-    refetchInterval: 5000,
-  });
+  const { isConnected } = useDeriv();
 
   return (
     <header className="fixed top-0 right-0 left-16 md:left-56 z-30 h-16 bg-card/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 md:px-6">
@@ -96,9 +84,7 @@ export const Header = ({
       <div className="flex items-center gap-3">
         {/* Connection Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary">
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          ) : isError ? (
+          {!isConnected ? (
             <>
               <WifiOff className="w-4 h-4 text-destructive" />
               <span className="text-xs font-medium text-destructive hidden sm:inline">Offline</span>
@@ -106,9 +92,7 @@ export const Header = ({
           ) : (
             <>
               <Wifi className="w-4 h-4 text-success" />
-              <span className={`text-xs font-medium hidden sm:inline ${health && health > 200 ? "text-warning" : "text-success"}`}>
-                {health}ms
-              </span>
+              <span className="text-xs font-medium text-success hidden sm:inline">Online</span>
             </>
           )}
         </div>

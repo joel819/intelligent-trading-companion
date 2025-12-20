@@ -7,6 +7,14 @@ import { Slider } from '@/components/ui/slider';
 import type { StrategySettings as StrategySettingsType } from '@/types/trading';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/api/client';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useTradingData } from '@/hooks/useTradingData';
 
 const defaultSettings: StrategySettingsType = {
   gridSize: 10,
@@ -20,6 +28,7 @@ const defaultSettings: StrategySettingsType = {
 };
 
 export const StrategySettings = () => {
+  const { symbols, selectedSymbol, setSelectedSymbol } = useTradingData();
   const [settings, setSettings] = useState<StrategySettingsType>(defaultSettings);
   const { toast } = useToast();
 
@@ -71,6 +80,37 @@ export const StrategySettings = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Trading Asset Selection */}
+        <div className="md:col-span-2 p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h4 className="font-semibold text-primary">Trading Asset</h4>
+              <p className="text-sm text-muted-foreground">Select the market you want the bot to trade on</p>
+            </div>
+            <div className="w-[300px]">
+              <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+                <SelectTrigger className="w-full bg-background border-border">
+                  <SelectValue placeholder="Search symbols..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {symbols.length === 0 ? (
+                    <div className="p-2 text-sm text-center text-muted-foreground">Loading symbols...</div>
+                  ) : (
+                    symbols.map((sym) => (
+                      <SelectItem key={sym.symbol} value={sym.symbol}>
+                        <div className="flex items-center justify-between w-full gap-4">
+                          <span>{sym.display_name}</span>
+                          <span className="text-[10px] font-mono opacity-50 uppercase">{sym.symbol}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         {/* Grid Trading Settings */}
         <div className="space-y-4">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Grid Trading</h4>
