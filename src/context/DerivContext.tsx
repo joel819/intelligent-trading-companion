@@ -112,7 +112,6 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
 
         if (socketRef.current) {
             // Close existing socket properly if possible
-            // Note: Simplistic approach for now
             socketRef.current = null;
         }
 
@@ -149,6 +148,8 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                                 currency: authData.currency || 'USD',
                                 isActive: true
                             });
+
+                            // Token sync with backend removed as backend is deprecated
                         }
                     })
                     .catch(err => {
@@ -181,6 +182,14 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
             // socketRef.current?.close();
         };
     }, [activeAccountId, accountsMetadata]);
+
+    // Automatically subscribe to ticks for the selected symbol
+    useEffect(() => {
+        if (isAuthorized && selectedSymbol) {
+            console.log(`Subscribing to ticks for ${selectedSymbol}`);
+            subscribeToTicks(selectedSymbol);
+        }
+    }, [isAuthorized, selectedSymbol]);
 
     const send = (payload: any) => {
         if (!socketRef.current) return Promise.reject("Socket not initialized");

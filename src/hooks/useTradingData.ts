@@ -10,23 +10,36 @@ const MOCK_NOTIFICATIONS: Notification[] = [];
 
 export const useTradingData = () => {
     const queryClient = useQueryClient();
-    const {
-        isConnected,
-        isAuthorized,
-        authError,
-        account: derivAccount,
-        accountsMetadata,
-        activeAccountId,
-        addAccount,
-        removeAccount,
-        switchAccount,
-        ticks: derivTicks,
-        symbols,
-        selectedSymbol,
-        setSelectedSymbol,
-        subscribeToTicks,
-        send
-    } = useDeriv();
+    // Context removed - fetching from backend
+    // const { ... } = useDeriv();
+    const [isConnected, setIsConnected] = useState(false); // Can check backend health
+    const [isAuthorized, setIsAuthorized] = useState(false); // Backend auth status
+
+    // Polling backend for status
+    const { data: backendStatus } = useQuery({
+        queryKey: ['backendStatus'],
+        queryFn: api.bot.getStatus,
+        refetchInterval: 1000
+    });
+
+    useEffect(() => {
+        if (backendStatus) {
+            setIsConnected(true);
+            setIsAuthorized(backendStatus.strategy !== 'Connecting...');
+        }
+    }, [backendStatus]);
+
+    // Mock ticks/symbols for now as they are not in REST requirements
+    const derivTicks: any[] = [];
+    const symbols: any[] = [];
+    const selectedSymbol = 'R_100';
+    const setSelectedSymbol = () => { };
+    const switchAccount = () => { };
+    const addAccount = () => { };
+    const removeAccount = () => { };
+    const accountsMetadata: any[] = [];
+    const authError = null;
+    const send = async () => { };
     // We don't use this state anymore as it's governed by activeAccountId in DerivContext
     // const [selectedAccountId, setSelectedAccountId] = useState<string>("ACC-001");
 
@@ -58,51 +71,38 @@ export const useTradingData = () => {
     }, [isAuthorized, selectedSymbol]);
 
     // ... (rest of local websocket logic kept for now) ...
-    useEffect(() => {
-        let ws: WebSocket | null = null;
-        let reconnectTimer: any;
-        const connect = () => {
-            try {
-                ws = new WebSocket('ws://localhost:8000/stream/ws');
-                ws.onopen = () => console.log('Connected to Local Trading Stream');
-                ws.onmessage = (event) => {
-                    try {
-                        const message = JSON.parse(event.data);
-                        if (message.type === 'log') setLogs(prev => [message.data, ...prev].slice(0, 100));
-                    } catch (e) { }
-                };
-                ws.onclose = () => reconnectTimer = setTimeout(connect, 30000);
-                ws.onerror = () => ws?.close();
-            } catch (e) { }
-        };
-        connect();
-        return () => { if (ws) ws.close(); clearTimeout(reconnectTimer); };
-    }, []);
+    // Fetch logs from backend
+    useQuery({
+        queryKey: ['logs'],
+        queryFn: async () => {
+            const res = await fetch('http://localhost:8000/logs');
+            if (res.ok) {
+                const newLogs = await res.json();
+                setLogs(newLogs);
+            }
+            return [];
+        },
+        refetchInterval: 2000
+    });
 
     // Accounts
     // Map account metadata to display-ready accounts, injecting live balance if authorized
-    const accounts = accountsMetadata.map(meta => {
-        // If this is the active AND authorized account, use the live data from derivAccount
-        if (meta.id === activeAccountId && derivAccount) {
-            return derivAccount;
-        }
-        // Otherwise use the metadata as a placeholder
-        return {
-            id: meta.id,
-            name: meta.name,
-            balance: 0,
-            equity: 0,
-            type: meta.type,
-            currency: 'USD',
-            isActive: meta.id === activeAccountId
-        };
+    // Load accounts from backend
+    const { data: accountsRaw = [] } = useQuery({
+        queryKey: ['accounts'],
+        queryFn: api.accounts.get,
+        refetchInterval: 5000
     });
 
-    const selectedAccount = accounts.find(a => a.id === activeAccountId) || accounts[0] || {
-        id: "loading", name: "Connecting to Deriv...", balance: 0, equity: 0, type: "demo", currency: "USD", isActive: false
-    };
+    // Map backend accounts to frontend format if needed (api returns correct format)
+    const accounts = accountsRaw;
 
-    // Bot Status
+    const selectedAccount = accounts.length > 0 ? accounts[0] : {
+        id: "loading", name: "Connecting to Backend...", balance: 0, equity: 0, type: "demo", currency: "USD", isActive: false
+    };
+    const activeAccountId = selectedAccount.id;
+
+    // Bot Status - Real Backend
     const { data: botStatus = {
         isRunning: false,
         strategy: "Ready",
@@ -113,7 +113,7 @@ export const useTradingData = () => {
     } } = useQuery({
         queryKey: ['botStatus'],
         queryFn: api.bot.getStatus,
-        enabled: false,
+        refetchInterval: 1000
     });
 
     const toggleBotMutation = useMutation({

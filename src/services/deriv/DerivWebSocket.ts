@@ -16,7 +16,7 @@ export class DerivWebSocket {
     connect() {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) return;
 
-        const url = `wss://ws.derivws.com/websockets/v3?app_id=${this.app_id}`;
+        const url = `wss://ws.deriv.com/websockets/v3?app_id=${this.app_id}`;
         this.socket = new WebSocket(url);
 
         this.socket.onopen = () => {

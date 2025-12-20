@@ -1,6 +1,10 @@
+import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.core.engine_wrapper import EngineWrapper
+from app.services.deriv_connector import deriv_client
+
+logger = logging.getLogger("settings")
 
 router = APIRouter()
 
@@ -27,6 +31,26 @@ def get_settings():
         "maxOpenTrades": 5,
         "drawdownLimit": 10
     }
+
+@router.post("/token")
+async def update_token(req: dict):
+    token = req.get("token")
+    app_id = req.get("appId")
+    print(f">>> BACKEND: Received token sync request for App ID: {app_id}")
+    if not token:
+        return {"status": "error", "message": "Token is required"}
+    
+    # Update token and reconnect
+    logger.info(f"Updating backend token for App ID: {app_id}")
+    deriv_client.token = token
+    if app_id:
+        deriv_client.app_id = app_id
+        
+    await deriv_client.disconnect()
+    await deriv_client.connect()
+    print(">>> BACKEND: Token updated and Reconnected.")
+    
+    return {"status": "success", "message": "Token updated and reconnecting..."}
 
 @router.post("/")
 def update_settings(settings: StrategySettings):

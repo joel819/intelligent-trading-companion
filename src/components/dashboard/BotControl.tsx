@@ -2,7 +2,7 @@ import { Power, Clock, Activity, Zap, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { BotStatus } from '@/types/trading';
 import { cn } from '@/lib/utils';
-import { api } from '@/api/client';
+// import { api } from '@/api/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface BotControlProps {
@@ -20,32 +20,23 @@ export const BotControl = ({ status, onToggle }: BotControlProps) => {
   const { toast } = useToast();
 
   const handlePanic = async () => {
-    try {
-      await api.bot.toggle('panic');
-      toast({
-        title: "PANIC STOP TRIGGERED",
-        description: "Bot stopped and all positions closed.",
-        variant: "destructive"
-      });
-      // Force refresh or state update here if needed (via React Query usually)
-      onToggle();
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to trigger panic stop", variant: "destructive" });
-    }
+    // Panic logic to be implemented in frontend
+    console.warn("Panic not implemented in frontend only mode yet");
+    toast({
+      title: "PANIC STOP TRIGGERED",
+      description: "Bot stopped and all positions closed (Simulated).",
+      variant: "destructive"
+    });
+    onToggle();
   };
 
   const handleToggle = async () => {
-    const command = status.isRunning ? 'stop' : 'start';
-    try {
-      await api.bot.toggle(command);
-      toast({
-        title: status.isRunning ? "Bot Stopped" : "Bot Started",
-        description: `Trading engine has been ${status.isRunning ? 'stopped' : 'started'}.`,
-      });
-      onToggle();
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to toggle bot", variant: "destructive" });
-    }
+    // API call moved to parent via onToggle (which is wired to useTradingData's toggleBot)
+    onToggle();
+    toast({
+      title: status.isRunning ? "Bot Stopped" : "Bot Started",
+      description: `Trading engine has been ${status.isRunning ? 'stopped' : 'started'}.`,
+    });
   };
 
   return (
