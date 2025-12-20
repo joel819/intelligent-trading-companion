@@ -13,6 +13,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 8000;
 const DERIV_APP_ID = process.env.DERIV_APP_ID;
 const DERIV_TOKEN = process.env.DERIV_API_TOKEN;
+const ML_SERVICE_URL = "http://localhost:5000/ml/predict";
 
 // Application State
 let isBotRunning = false;
@@ -96,9 +97,40 @@ const connectToDeriv = () => {
             }
 
             // ... handle other messages (ticks, etc.) logic would go here
-            if (isBotRunning && isAuthorized) {
-                // Placeholder for trading logic
-                // If tick comes in => run strategy => ws.send({ buy: ... })
+            if (msg.msg_type === 'tick') {
+                const tick = msg.tick;
+                if (isBotRunning && isAuthorized) {
+                    // Prepare payload for ML Service
+                    const payload = {
+                        tick: {
+                            symbol: tick.symbol,
+                            bid: tick.quote,
+                            ask: tick.quote,
+                            epoch: tick.epoch
+                        },
+                        open_positions: [] // Position tracking to be implemented
+                    };
+
+                    // Call ML Service
+                    fetch(ML_SERVICE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    })
+                        .then(res => res.json())
+                        .then(signal => {
+                            if (signal && signal.action !== 0) {
+                                addLog('info', `ML Signal Received: ${signal.action} (${signal.comment})`);
+                                // Execution Logic Placeholder
+                                // if (signal.action === 1) buy...
+                                // if (signal.action === 2) sell...
+                            }
+                        })
+                        .catch(e => {
+                            // Silent fail to avoid spamming logs if ML service is down, maybe log once
+                            // console.error("ML Service unreachable", e.message);
+                        });
+                }
             }
 
         } catch (e) {
