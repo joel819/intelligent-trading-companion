@@ -29,11 +29,8 @@ export const AccountsList = ({ accounts, selectedAccountId, onSelect }: Accounts
     if (!newAccount.name || !newAccount.appId || !newAccount.token) return;
 
     addAccount({
-      id: `acc-${Date.now()}`,
-      name: newAccount.name,
       appId: newAccount.appId,
-      token: newAccount.token,
-      type: newAccount.type
+      token: newAccount.token
     });
 
     setNewAccount({ name: '', appId: '', token: '', type: 'demo' });

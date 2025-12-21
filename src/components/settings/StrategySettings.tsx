@@ -25,6 +25,7 @@ const defaultSettings: StrategySettingsType = {
   takeProfitPoints: 100,
   maxOpenTrades: 5,
   drawdownLimit: 10,
+  symbol: 'R_100',
 };
 
 export const StrategySettings = () => {
@@ -41,7 +42,7 @@ export const StrategySettings = () => {
 
   const handleSave = async () => {
     try {
-      await api.settings.update(settings);
+      await api.settings.update({ ...settings, symbol: selectedSymbol });
       toast({
         title: "Settings Saved",
         description: "Strategy settings have been updated successfully.",
@@ -195,8 +196,8 @@ export const StrategySettings = () => {
             <Slider
               value={[settings.confidenceThreshold * 100]}
               onValueChange={(value) => setSettings({ ...settings, confidenceThreshold: value[0] / 100 })}
-              max={95}
-              min={50}
+              max={100}
+              min={0}
               step={5}
             />
             <p className="text-xs text-muted-foreground">

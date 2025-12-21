@@ -1,4 +1,5 @@
-import { Power, Clock, Activity, Zap, AlertTriangle } from 'lucide-react';
+import { Power, Clock, Activity, Zap, AlertTriangle, Download } from 'lucide-react';
+import { api } from '@/api/client';
 import { Button } from '@/components/ui/button';
 import type { BotStatus } from '@/types/trading';
 import { cn } from '@/lib/utils';
@@ -37,6 +38,31 @@ export const BotControl = ({ status, onToggle }: BotControlProps) => {
       title: status.isRunning ? "Bot Stopped" : "Bot Started",
       description: `Trading engine has been ${status.isRunning ? 'stopped' : 'started'}.`,
     });
+  };
+
+  const handleDownloadLogs = async () => {
+    try {
+      const blob = await api.bot.downloadLogs();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'bot_audit_logs.txt';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({
+        title: "Logs Downloaded",
+        description: "Audit logs have been saved to your device.",
+        className: "bg-green-600 text-white"
+      });
+    } catch (e) {
+      toast({
+        title: "Download Failed",
+        description: "Could not download logs.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -93,8 +119,11 @@ export const BotControl = ({ status, onToggle }: BotControlProps) => {
       <div className="flex flex-col gap-3">
         <Button
           onClick={handleToggle}
-          variant={status.isRunning ? "destructive" : "success"}
-          className="w-full"
+          variant={status.isRunning ? "destructive" : "default"}
+          className={cn(
+            "w-full",
+            !status.isRunning && "bg-green-600 hover:bg-green-700 text-white"
+          )}
           size="lg"
         >
           <Power className="w-4 h-4 mr-2" />
@@ -112,6 +141,15 @@ export const BotControl = ({ status, onToggle }: BotControlProps) => {
             PANIC STOP
           </Button>
         )}
+
+        <Button
+          onClick={handleDownloadLogs}
+          variant="outline"
+          className="w-full text-xs h-8 mt-2"
+        >
+          <Download className="w-3 h-3 mr-2" />
+          Download Audit Logs
+        </Button>
       </div>
     </div>
   );

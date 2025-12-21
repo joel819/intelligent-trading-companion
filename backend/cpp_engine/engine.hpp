@@ -44,7 +44,8 @@ struct Signal {
   double lots;
   double sl;
   double tp;
-  char comment[64]; // Reason for trade (e.g., "Grid Level 5")
+  double confidence; // Confidence score (0.0 - 1.0)
+  char comment[64];  // Reason for trade (e.g., "Grid Level 5")
 };
 
 struct Position {

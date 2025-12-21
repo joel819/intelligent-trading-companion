@@ -1,18 +1,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import bot, accounts, settings, stream
+from app.api import bot, accounts, settings, stream, logs, trades, market
 
 from contextlib import asynccontextmanager
-# from app.services.deriv_connector import deriv_client # Disabled for ML Service Mode
+from app.services.deriv_connector import deriv_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     print("Starting ML Service...")
-    # await deriv_client.connect() # Disabled
+    await deriv_client.connect()
     yield
     # Shutdown
-    # await deriv_client.disconnect() # Disabled
+    await deriv_client.disconnect()
 
 app = FastAPI(title="Intelligent Trading Companion", lifespan=lifespan)
 
@@ -29,7 +29,11 @@ app.add_middleware(
 app.include_router(bot.router, prefix="/bot", tags=["Bot"])
 app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
+app.include_router(market.router, prefix="/market", tags=["Market"])
+app.include_router(trades.router, prefix="/trade", tags=["Trades"])
 app.include_router(stream.router, prefix="/stream", tags=["Stream"])
+app.include_router(logs.router, prefix="/logs", tags=["Logs"])
+app.include_router(trades.router, prefix="", tags=["Trades"])
 
 # ML Router
 from app.api import ml

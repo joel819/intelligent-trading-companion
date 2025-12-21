@@ -48,30 +48,30 @@ export const PositionsTable = ({ positions }: PositionsTableProps) => {
                 <TableCell>
                   <div className={cn(
                     "inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium",
-                    position.side === 'buy' 
-                      ? "bg-success/20 text-success" 
+                    (position.side || '').toLowerCase() === 'buy'
+                      ? "bg-success/20 text-success"
                       : "bg-destructive/20 text-destructive"
                   )}>
-                    {position.side === 'buy' ? (
+                    {(position.side || '').toLowerCase() === 'buy' ? (
                       <ArrowUpRight className="w-3 h-3" />
                     ) : (
                       <ArrowDownRight className="w-3 h-3" />
                     )}
-                    {position.side.toUpperCase()}
+                    {(position.side || 'N/A').toUpperCase()}
                   </div>
                 </TableCell>
-                <TableCell className="text-right font-mono">{position.lots}</TableCell>
+                <TableCell className="text-right font-mono">{position.lots || 0}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {position.entryPrice.toFixed(position.symbol.includes('JPY') ? 3 : 5)}
+                  {(position.entryPrice || 0).toFixed((position.symbol || '').includes('JPY') ? 3 : 5)}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {position.currentPrice.toFixed(position.symbol.includes('JPY') ? 3 : 5)}
+                  {(position.currentPrice || 0).toFixed((position.symbol || '').includes('JPY') ? 3 : 5)}
                 </TableCell>
                 <TableCell className={cn(
                   "text-right font-mono font-semibold",
-                  position.pnl >= 0 ? "text-success" : "text-destructive"
+                  (position.pnl || 0) >= 0 ? "text-success" : "text-destructive"
                 )}>
-                  {position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)}
+                  {(position.pnl || 0) >= 0 ? '+' : ''}${(position.pnl || 0).toFixed(2)}
                 </TableCell>
               </TableRow>
             ))}

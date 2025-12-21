@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Account, Notification } from '@/types/trading';
-import { useDeriv } from '@/hooks/useDeriv';
 
 interface HeaderProps {
   accounts: Account[];
@@ -26,6 +25,7 @@ interface HeaderProps {
   onAccountChange: (id: string) => void;
   notifications: Notification[];
   onNotificationsClick: () => void;
+  isConnected: boolean;
 }
 
 export const Header = ({
@@ -34,10 +34,11 @@ export const Header = ({
   onAccountChange,
   notifications,
   onNotificationsClick,
+  isConnected
 }: HeaderProps) => {
   const unreadCount = notifications.filter(n => !n.read).length;
+  // const { isConnected } = useDeriv(); // Removed
   const selectedAccount = accounts.find(a => a.id === selectedAccountId);
-  const { isConnected } = useDeriv();
 
   return (
     <header className="fixed top-0 right-0 left-16 md:left-56 z-30 h-16 bg-card/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-4 md:px-6">

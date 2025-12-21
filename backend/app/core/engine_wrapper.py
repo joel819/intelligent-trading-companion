@@ -40,6 +40,7 @@ class Signal(Structure):
         ("lots", c_double),
         ("sl", c_double),
         ("tp", c_double),
+        ("confidence", c_double),
         ("comment", c_char * 64),
     ]
 
@@ -156,5 +157,6 @@ class EngineWrapper:
             "lots": signal.lots,
             "sl": signal.sl,
             "tp": signal.tp,
+            "confidence": round(signal.confidence * 100, 2), # Convert to 0-100%
             "comment": signal.comment.decode('utf-8')
         }

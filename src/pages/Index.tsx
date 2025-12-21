@@ -13,9 +13,11 @@ import { AccountsList } from '@/components/accounts/AccountsList';
 import { useTradingData } from '@/hooks/useTradingData';
 import { Wallet, TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [lotSize, setLotSize] = useState(0.1); // Default Lot Size
   const {
     accounts,
     selectedAccount,
@@ -28,13 +30,55 @@ const Index = () => {
     toggleBot,
     notifications,
     markNotificationRead,
+    isConnected,
+    executeTrade,
+    selectedSymbol
   } = useTradingData();
 
   const handleNotificationsClick = () => {
     setActiveTab('notifications');
   };
 
-  const totalPnl = positions.reduce((sum, pos) => sum + pos.pnl, 0);
+  const safePositions = Array.isArray(positions) ? positions : [];
+  const totalPnl = safePositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
+
+  const handleManualTrade = (type: 'CALL' | 'PUT') => {
+    executeTrade({
+      symbol: selectedSymbol,
+      contract_type: type,
+      amount: lotSize,
+      duration: 1,
+      duration_unit: 'm'
+    });
+  };
+
+  const [isBypassed, setIsBypassed] = useState(false);
+  const displayAccount = selectedAccount;
+  const isConnecting = botStatus.strategy === "Connecting..." || (!isConnected && !isBypassed);
+
+  if (activeTab === 'dashboard' && isConnecting && !isBypassed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-6 animate-pulse">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
+          <div className="space-y-2">
+            <p className="text-xl font-semibold text-foreground">Securely Connecting to Deriv...</p>
+            <p className="text-sm text-muted-foreground">Checking account status and live feed</p>
+          </div>
+          <div className="pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBypassed(true)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Manual Setup Mode
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -47,6 +91,7 @@ const Index = () => {
           onAccountChange={setSelectedAccountId}
           notifications={notifications}
           onNotificationsClick={handleNotificationsClick}
+          isConnected={isConnected}
         />
 
         <main className="pt-20 pb-8 px-4 md:px-6">
@@ -56,16 +101,16 @@ const Index = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                   title="Balance"
-                  value={`$${selectedAccount.balance.toLocaleString()}`}
+                  value={`$${(displayAccount.balance ?? 0).toLocaleString()}`}
                   icon={<Wallet className="w-5 h-5" />}
                   trend="neutral"
                 />
                 <StatCard
                   title="Equity"
-                  value={`$${selectedAccount.equity.toLocaleString()}`}
+                  value={`$${(displayAccount.equity ?? 0).toLocaleString()}`}
                   icon={<TrendingUp className="w-5 h-5" />}
-                  trend={selectedAccount.equity >= selectedAccount.balance ? 'up' : 'down'}
-                  trendValue={`${((selectedAccount.equity - selectedAccount.balance) / selectedAccount.balance * 100).toFixed(2)}%`}
+                  trend={(displayAccount.equity ?? 0) >= (displayAccount.balance ?? 0) ? 'up' : 'down'}
+                  trendValue={`${(displayAccount.balance ?? 0) > 0 ? (((displayAccount.equity ?? 0) - (displayAccount.balance ?? 0)) / (displayAccount.balance ?? 0) * 100).toFixed(2) : "0.00"}%`}
                 />
                 <StatCard
                   title="Open P&L"
@@ -74,10 +119,11 @@ const Index = () => {
                   trend={totalPnl >= 0 ? 'up' : 'down'}
                 />
                 <StatCard
-                  title="Open Positions"
-                  value={positions.length}
+                  title="Profit Today"
+                  value={`${botStatus.profitToday >= 0 ? '+' : ''}$${botStatus.profitToday.toFixed(2)}`}
                   icon={<Activity className="w-5 h-5" />}
-                  subtitle="Active trades"
+                  trend={botStatus.profitToday >= 0 ? 'up' : 'down'}
+                  subtitle={`${safePositions.length} active positions`}
                 />
               </div>
 
@@ -85,7 +131,30 @@ const Index = () => {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column */}
                 <div className="lg:col-span-2 space-y-6">
-                  <PositionsTable positions={positions} />
+                  {/* Manual Trade Controls */}
+                  <div className="flex flex-col gap-4 p-4 bg-muted/20 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm font-medium">Lot Size:</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        value={lotSize}
+                        onChange={(e) => setLotSize(parseFloat(e.target.value))}
+                        className="p-2 rounded border border-input bg-background w-24"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button onClick={() => handleManualTrade('CALL')} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded font-bold">
+                        BUY / CALL (Up)
+                      </button>
+                      <button onClick={() => handleManualTrade('PUT')} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded font-bold">
+                        SELL / PUT (Down)
+                      </button>
+                    </div>
+                  </div>
+
+                  <PositionsTable positions={safePositions} />
                   <LogsStream logs={logs} />
                 </div>
 
@@ -101,7 +170,7 @@ const Index = () => {
           {activeTab === 'positions' && (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-xl font-semibold">Open Positions</h2>
-              <PositionsTable positions={positions} />
+              <PositionsTable positions={safePositions} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <TickFeed ticks={ticks} />
                 <LogsStream logs={logs} />

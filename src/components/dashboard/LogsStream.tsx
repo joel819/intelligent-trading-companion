@@ -20,17 +20,17 @@ export const LogsStream = ({ logs }: LogsStreamProps) => {
         <Terminal className="w-4 h-4 text-primary" />
         <h3 className="font-semibold text-foreground">System Logs</h3>
       </div>
-      
+
       <div className="space-y-1.5 max-h-[400px] overflow-y-auto scrollbar-thin font-mono text-xs">
         {logs.length === 0 ? (
           <p className="text-muted-foreground">No logs yet...</p>
         ) : (
           logs.map((log, index) => {
-            const config = levelConfig[log.level];
+            const config = levelConfig[log.level] || levelConfig.info;
             const Icon = config.icon;
-            
+
             return (
-              <div 
+              <div
                 key={log.id}
                 className={cn(
                   "flex items-start gap-2 py-1.5 px-2 rounded",
@@ -40,11 +40,11 @@ export const LogsStream = ({ logs }: LogsStreamProps) => {
               >
                 <Icon className={cn("w-3.5 h-3.5 mt-0.5 shrink-0", config.color)} />
                 <span className="text-muted-foreground shrink-0">
-                  {new Date(log.timestamp).toLocaleTimeString('en-US', { 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
+                  {new Date(log.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
                     second: '2-digit',
-                    hour12: false 
+                    hour12: false
                   })}
                 </span>
                 <span className="text-accent shrink-0">[{log.source}]</span>

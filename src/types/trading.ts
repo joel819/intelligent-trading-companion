@@ -38,12 +38,14 @@ export interface LogEntry {
 }
 
 export interface BotStatus {
+  isConnected: boolean;
   isRunning: boolean;
   strategy: string;
   lastTrade: string | null;
   uptime: number;
   tradesExecuted: number;
   profitToday: number;
+  symbol: string;
 }
 
 export interface StrategySettings {
@@ -55,6 +57,7 @@ export interface StrategySettings {
   takeProfitPoints: number;
   maxOpenTrades: number;
   drawdownLimit: number;
+  symbol: string;
 }
 
 export interface Notification {

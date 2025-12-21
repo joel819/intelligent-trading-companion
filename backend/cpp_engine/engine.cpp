@@ -142,17 +142,23 @@ Signal process_tick(Tick *tick, Position *positions, int num_positions) {
       // (bounce down) -> wait, dist does this. If dist > 0, price > line ->
       // SELL If dist < 0, price < line -> BUY
 
+      double confidence = 1.0 - (std::abs(dist) / tolerance);
+      if (confidence < 0)
+        confidence = 0;
+
       if (dist > 0) {
         sig.action = ACTION_SELL;
         sig.lots = lots;
         sig.sl = tick->bid + g_config.stop_loss_points;
         sig.tp = tick->bid - g_config.take_profit_points;
+        sig.confidence = confidence;
         std::strcpy(sig.comment, "Grid Sell");
       } else {
         sig.action = ACTION_BUY;
         sig.lots = lots;
         sig.sl = tick->ask - g_config.stop_loss_points;
         sig.tp = tick->ask + g_config.take_profit_points;
+        sig.confidence = confidence;
         std::strcpy(sig.comment, "Grid Buy");
       }
 
