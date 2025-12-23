@@ -141,12 +141,17 @@ class EngineWrapper:
         c_positions = PositionArray()
         
         for i, pos in enumerate(open_positions):
-            c_positions[i].ticket = pos.get('ticket', 0)
-            c_positions[i].type = 0 if pos.get('type') == 'buy' else 1
-            c_positions[i].open_price = pos.get('entry_price', 0.0)
-            c_positions[i].volume = pos.get('volume', 0.0)
-            c_positions[i].sl = pos.get('sl', 0.0)
-            c_positions[i].tp = pos.get('tp', 0.0)
+            try:
+                ticket_str = str(pos.get('id', '0'))
+                c_positions[i].ticket = int(ticket_str) if ticket_str.isdigit() else 0
+            except (ValueError, TypeError):
+                c_positions[i].ticket = 0
+                
+            c_positions[i].type = 0 if pos.get('side') == 'buy' else 1
+            c_positions[i].open_price = float(pos.get('entryPrice', 0.0))
+            c_positions[i].volume = float(pos.get('lots', 0.0))
+            c_positions[i].sl = float(pos.get('sl', 0.0))
+            c_positions[i].tp = float(pos.get('tp', 0.0))
 
         # Call Engine
         signal = cls._lib.process_tick(ctypes.byref(c_tick), c_positions, num_pos)

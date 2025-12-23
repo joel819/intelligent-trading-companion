@@ -73,6 +73,7 @@ async def update_settings(settings: StrategySettings):
         
         # Update deriv_client for persistence during session
         deriv_client.default_config.update(config_dict)
+        logger.info(f"Settings Updated in DerivClient: {deriv_client.default_config}")
         
         # Handle symbol switch
         if settings.symbol != deriv_client.target_symbol:

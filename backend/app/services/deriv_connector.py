@@ -20,9 +20,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DerivConnector:
-    def __init__(self, token: str = None, app_id: str = "1089"):
+    def __init__(self, token: str = None, app_id: str = "65395"):
         self.token = token or os.getenv("DERIV_TOKEN")
-        self.app_id = app_id or os.getenv("DERIV_APP_ID", "1089")
+        self.app_id = app_id or os.getenv("DERIV_APP_ID", "65395")
         if not self.token:
             logger.warning("No DERIV_TOKEN found in environment. Connection may fail.")
         self.ws = None
@@ -132,86 +132,76 @@ class DerivConnector:
             logger.error("No token provided for authorization")
             return
             
-        req = {"authorize": target_token}
-        resp = await self.send_request(req)
-        
-        if 'error' in resp:
-            error_msg = f"Backend Auth Failed: {resp['error'].get('message', 'Unknown error')}"
-            logger.error(error_msg)
-            await stream_manager.broadcast_log({
-                "id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
-                "message": error_msg,
-                "level": "error",
-                "source": "Deriv"
-            })
-        elif 'authorize' in resp:
-            auth_data = resp['authorize']
-            msg = f"Backend Authorized as {auth_data.get('fullname')} ({auth_data.get('loginid')})"
-            logger.info(msg)
-            await stream_manager.broadcast_log({
-                "id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
-                "message": msg,
-                "level": "success",
-                "source": "Deriv"
-            })
+        for attempt in range(1, 4):
+            req = {"authorize": target_token}
+            resp = await self.send_request(req)
             
-            # Setup current account
-            self.current_account = {
-                "id": auth_data.get("loginid"),
-                "balance": float(auth_data.get("balance") if auth_data.get("balance") is not None else 0.0),
-                "currency": auth_data.get("currency", "USD"),
-                "email": auth_data.get("email")
-            }
-            self.active_account_id = self.current_account["id"]
+            if 'error' in resp:
+                await asyncio.sleep(2)
+                continue
             
-            # Parse Account List
-            raw_list = auth_data.get("account_list", [])
-            self.available_accounts = []
-            
-            for acc in raw_list:
-                acc_id = acc.get("loginid")
-                self.available_accounts.append({
-                    "id": acc_id,
-                    "name": f"Deriv {acc.get('currency')} {'Demo' if acc.get('is_virtual') else 'Real'}",
-                    "type": "demo" if acc.get("is_virtual") else "real",
-                    "currency": acc.get("currency"),
-                    "balance": 0.0, 
-                    "equity": 0.0,
-                    "expiry": None,
-                    "isActive": acc_id == self.active_account_id,
-                    "token": acc.get("token") # Some tokens are provided in list
+            if 'authorize' in resp:
+                auth_data = resp['authorize']
+                loginid = auth_data.get('loginid')
+                fullname = auth_data.get('fullname')
+                msg = f"Backend Authorized as {fullname} ({loginid})"
+                logger.info(msg)
+                
+                await stream_manager.broadcast_log({
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "message": msg,
+                    "level": "success",
+                    "source": "Deriv"
                 })
                 
-            for acc in self.available_accounts:
-                if acc["id"] == self.active_account_id:
-                    acc["balance"] = self.current_account["balance"]
-                    acc["equity"] = self.current_account["balance"]
-                    
-            # Set top-level token to the authorized one if not set
-            if not self.token:
-                self.token = target_token
+                # Setup current account
+                self.current_account = {
+                    "id": loginid,
+                    "balance": float(auth_data.get("balance") if auth_data.get("balance") is not None else 0.0),
+                    "currency": auth_data.get("currency", "USD"),
+                    "email": auth_data.get("email")
+                }
+                self.active_account_id = self.current_account["id"]
                 
-            # Initial Engine Sync
-            try:
-                EngineWrapper.update_account(
-                    balance=self.current_account['balance'],
-                    equity=self.current_account['balance'], # Assuming equity ~ balance initially
-                    margin_free=self.current_account['balance']
-                )
-                logger.info(f"Engine Account Synced: Balance=${self.current_account['balance']}")
-            except Exception as e:
-                logger.error(f"Failed to sync engine account: {e}")
+                # Parse Account List
+                raw_list = auth_data.get("account_list", [])
+                self.available_accounts = []
+                for acc in raw_list:
+                    acc_id = acc.get("loginid")
+                    self.available_accounts.append({
+                        "id": acc_id,
+                        "name": f"Deriv {acc.get('currency')} {'Demo' if acc.get('is_virtual') else 'Real'}",
+                        "type": "demo" if acc.get("is_virtual") else "real",
+                        "currency": acc.get("currency"),
+                        "balance": 0.0,
+                        "equity": 0.0,
+                        "isActive": acc_id == self.active_account_id
+                    })
+                
+                # Map balance for active
+                for acc in self.available_accounts:
+                    if acc["id"] == self.active_account_id:
+                        acc["balance"] = self.current_account["balance"]
+                        acc["equity"] = self.current_account["balance"]
+                
+                if not self.token:
+                    self.token = target_token
+                    
+                return
+        
+        print(">>> ALL AUTH ATTEMPTS FAILED")
+
 
     async def subscribe_ticks(self):
         if not self.ws: return
-        req = {
-            "ticks": self.active_symbols,
-            "subscribe": 1
-        }
-        await self.ws.send(json.dumps(req))
-        logger.info(f"Subscribed to {self.active_symbols}")
+        for symbol in self.active_symbols:
+            req = {
+                "ticks": symbol,
+                "subscribe": 1
+            }
+            await self.ws.send(json.dumps(req))
+            logger.info(f"Subscribed to tick feed: {symbol}")
 
     async def subscribe_balance(self):
         if not self.ws: return
@@ -222,7 +212,7 @@ class DerivConnector:
     async def subscribe_portfolio(self):
         if not self.ws: return
         # portfolio: 1 gives us the initial list of open positions and future updates
-        req = {"portfolio": 1, "subscribe": 1}
+        req = {"portfolio": 1} 
         await self.ws.send(json.dumps(req))
         logger.info("Subscribed to Portfolio (Open Positions)")
 
@@ -267,8 +257,10 @@ class DerivConnector:
         self.active_requests[req_id] = future
         
         try:
+            logger.info(f">>> SENDING: {request}")
             await self.ws.send(json.dumps(request))
             response = await asyncio.wait_for(future, timeout=30.0) 
+            logger.info(f">>> GOT RESPONSE FOR {req_id}")
             return response
         except asyncio.TimeoutError:
             logger.error(f"Request {req_id} timed out")
@@ -281,26 +273,36 @@ class DerivConnector:
             try:
                 message = await self.ws.recv()
                 data = json.loads(message)
-                
                 # Check for req_id match in both top-level and echo_req
                 req_id = data.get('req_id')
                 if not req_id and 'echo_req' in data:
                     req_id = data['echo_req'].get('req_id')
                 
-                # Try to cast to int for matching if it was sent as int
-                try:
-                    if req_id is not None:
-                         req_id_int = int(req_id)
-                         if req_id_int in self.active_requests:
-                             if not self.active_requests[req_id_int].done():
-                                 self.active_requests[req_id_int].set_result(data)
-                except (ValueError, TypeError):
-                    # Fallback to string matching if it's a UUID
-                    if req_id in self.active_requests:
-                         if not self.active_requests[req_id].done():
-                             self.active_requests[req_id].set_result(data)
-                else:
-                    logger.debug(f"Unmatched message: {data.get('msg_type', 'unknown')} (req_id: {req_id})")
+                # logger.debug is enough for production
+                if data.get('msg_type') not in ['tick', 'ohlc']:
+                    logger.debug(f"Deriv WebSocket Received: {data.get('msg_type')} (req_id: {req_id})")
+                
+                # Try matching by req_id
+                if req_id is not None:
+                    # Try as provided type, then as int, then as string
+                    match_found = False
+                    keys_to_try = [req_id]
+                    try:
+                        keys_to_try.append(int(req_id))
+                    except: pass
+                    keys_to_try.append(str(req_id))
+                    
+                    for k in keys_to_try:
+                        if k in self.active_requests:
+                            logger.info(f"MATCHED req_id {k}")
+                            future = self.active_requests[k]
+                            if not future.done():
+                                future.set_result(data)
+                            match_found = True
+                            break
+                    
+                    if not match_found and data.get('msg_type') not in ['tick', 'ohlc']:
+                        logger.warning(f"req_id {req_id} NOT found in active_requests: {list(self.active_requests.keys())}")
                 
                 if 'tick' in data:
                     asyncio.create_task(self.handle_tick(data['tick']))
@@ -356,34 +358,53 @@ class DerivConnector:
                 is_running = EngineWrapper.get_bot_state()['is_running']
                 logger.info(f"Engine Signal: {signal['action']} | Bot Running: {is_running}")
             
-            if signal['action'] != 0:
-                logger.info(f"Signal from Engine: {signal}")
+            action = signal.get('action', 0)
+            confidence = float(signal.get('confidence', 0.0))
+            threshold = float(self.default_config.get('confidence_threshold', 0.0)) * 100
+
+            # 1. Panic Signal (Action 5) - Highest Priority
+            if action == 5:
+                logger.critical(f"PANIC STOP TRIGGERED BY ENGINE for {symbol}")
                 await stream_manager.broadcast_log({
                     "id": str(uuid.uuid4()),
                     "timestamp": datetime.now().isoformat(),
-                    "message": f"ML Signal: {signal['action']} | Confidence: {signal.get('confidence', 0)}%",
-                    "level": "info",
+                    "message": "!!! PANIC STOP TRIGGERED !!!",
+                    "level": "error",
                     "source": "Engine"
                 })
+                # Add stop bot logic if desired
+                return
+
+            # 2. Trading Signals (Buy=1, Sell=2)
+            if action in [1, 2]:
+                # Log the signal attempt
+                logger.info(f"[ENGINE] Signal Received: {action} | Confidence: {confidence}% | Threshold: {threshold}%")
                 
-                # Execute automated trade
-                conf_threshold = self.default_config.get('confidence_threshold', 0.0) * 100
-                if signal['confidence'] < conf_threshold:
-                    logger.warning(f"Trade Ignored: Confidence {signal['confidence']}% below threshold {conf_threshold}%")
+                # Confidence Threshold Check
+                if confidence < threshold:
+                    logger.warning(f"[ENGINE] Trade Ignored: {confidence}% < {threshold}%")
+                    await stream_manager.broadcast_log({
+                        "id": str(uuid.uuid4()),
+                        "timestamp": datetime.now().isoformat(),
+                        "message": f"Signal Skipped (Low Confidence): {confidence}% < {threshold}%",
+                        "level": "warn",
+                        "source": "Engine"
+                    })
                     return
 
+                # Execute
+                logger.info(f"[ENGINE] Executing Automated Trade: {action} on {symbol}")
                 await self.execute_buy(
                     symbol=symbol,
-                    contract_type="CALL" if signal['action'] == 1 else "PUT",
+                    contract_type="CALL" if action == 1 else "PUT",
                     amount=signal.get('lots', 0.35),
                     metadata={"source": "Engine", "signal": signal}
                 )
             
-            elif signal['action'] == 5: 
-                 logger.critical("PANIC STOP")
-                 
         except Exception as e:
-             logger.error(f"Engine/Trade Error: {e}")
+            logger.error(f"Engine/Trade Activity Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     async def execute_buy(self, symbol: str, contract_type: str, amount: float, metadata: dict = None):
         """
@@ -538,6 +559,14 @@ class DerivConnector:
         
         if is_sold and cid not in self.processed_contracts:
             self.processed_contracts.add(cid)
+            
+            # Limit set size to prevent memory growth (keep last 1000)
+            if len(self.processed_contracts) > 1000:
+                # Remove oldest half
+                to_remove = list(self.processed_contracts)[:500]
+                for old_cid in to_remove:
+                    self.processed_contracts.discard(old_cid)
+            
             # Track P&L for session
             profit = float(contract.get('profit', 0))
             self.session_stats["pnl"] += profit
