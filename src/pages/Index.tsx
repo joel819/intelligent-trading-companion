@@ -3,9 +3,11 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { BotControl } from '@/components/dashboard/BotControl';
+import { MarketStatusCard } from '@/components/dashboard/MarketStatusCard';
 import { PositionsTable } from '@/components/dashboard/PositionsTable';
 import { TickFeed } from '@/components/dashboard/TickFeed';
 import { LogsStream } from '@/components/dashboard/LogsStream';
+import { SkippedSignalsPanel } from '@/components/dashboard/SkippedSignalsPanel';
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 import { AccountsList } from '@/components/accounts/AccountsList';
@@ -26,6 +28,7 @@ const Index = () => {
     positions,
     ticks,
     logs,
+    skippedSignals,
     botStatus,
     toggleBot,
     notifications,
@@ -155,12 +158,14 @@ const Index = () => {
                   </div>
 
                   <PositionsTable positions={safePositions} />
+                  <SkippedSignalsPanel signals={skippedSignals} />
                   <LogsStream logs={logs} />
                 </div>
 
                 {/* Right Column */}
                 <div className="space-y-6">
                   <BotControl status={botStatus} onToggle={toggleBot} />
+                  <MarketStatusCard />
                   <TickFeed ticks={ticks} />
                 </div>
               </div>

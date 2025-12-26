@@ -1,175 +1,196 @@
-#include "engine.hpp"
-#include <cmath>
-#include <cstring>
-#include <ctime>
+#include "json.hpp" // Using nlohmann/json
+#include <chrono>
 #include <iostream>
+#include <string>
+#include <unordered_map>
 
-// Global State (Persists in memory as long as shared lib is loaded)
-static Config g_config;
-static BotState g_state = {false, 0, 0.0, 0, 0.0};
-static AccountInfo g_account = {0.0, 0.0, 0.0};
-static time_t g_start_time = 0;
+using json = nlohmann::json;
+using namespace std;
 
-// Internal helpers
-double calculate_lots(double risk_per_trade, double stop_loss_dist) {
-  if (stop_loss_dist <= 0)
-    return 0.01;
-  // Risk amount = Equity * (Risk% / 100)
-  // Lots = Risk Amount / (Points * PointValue) -> Simplified for Volatility
-  // Indices Assuming 1 Point = 1 USD for simplicity (Needs thorough symbol data
-  // in production)
-  double risk_amount = g_account.equity * (g_config.risk_percent / 100.0);
-  double lots = risk_amount / stop_loss_dist;
+// --- Safety Constants ---
+const double MAX_LATENCY_MS = 1000.0;
+const int MAX_ACTIVE_TRADES = 10;
+const double MIN_STAKE = 0.35;
+const double MAX_STAKE = 100.0;
 
-  // Clamp to logical bounds (e.g. 0.01 to Max)
-  if (lots < 0.01)
-    lots = 0.01;
-  if (lots > g_config.max_lots)
-    lots = g_config.max_lots;
+class TradingEngine {
+private:
+  std::unordered_map<std::string, double> price_cache;
+  std::chrono::time_point<std::chrono::steady_clock> last_trade_time;
+  int cooldown_seconds = 60;
+  bool is_initialized = false;
+  bool is_running = true;
+  std::chrono::time_point<std::chrono::steady_clock> start_time;
 
-  return std::floor(lots * 100) / 100.0; // Round to 2 decimals
-}
+public:
+  TradingEngine() {
+    // Initialize with a past time to allow immediate trading
+    last_trade_time = std::chrono::steady_clock::now() -
+                      std::chrono::seconds(cooldown_seconds * 2);
+    start_time = std::chrono::steady_clock::now();
+  }
+
+  void initialize(const string &config_json) {
+    try {
+      auto config = json::parse(config_json);
+      if (config.contains("cooldown_seconds")) {
+        cooldown_seconds = config["cooldown_seconds"];
+      }
+      is_initialized = true;
+      cout << "[CPP] Engine Initialized. Cooldown: " << cooldown_seconds << "s"
+           << endl;
+    } catch (...) {
+      cout << "[CPP] Init Error: Invalid Config" << endl;
+    }
+  }
+
+  // Safety Validation Layer
+  struct ValidationResult {
+    bool valid;
+    string error;
+  };
+
+  ValidationResult validate_trade(double stake, const string &symbol,
+                                  int active_trades) {
+    if (!is_initialized)
+      return {false, "Engine not initialized"};
+    if (!is_running)
+      return {false, "Bot is stopped"};
+
+    if (stake < MIN_STAKE)
+      return {false, "Stake below minimum (" + to_string(MIN_STAKE) + ")"};
+    if (stake > MAX_STAKE)
+      return {false, "Stake above maximum (" + to_string(MAX_STAKE) + ")"};
+
+    if (symbol.empty())
+      return {false, "Symbol is empty"};
+
+    if (active_trades >= MAX_ACTIVE_TRADES) {
+      return {false, "Max active trades limit reached"};
+    }
+
+    // Cooldown check
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed =
+        std::chrono::duration_cast<std::chrono::seconds>(now - last_trade_time)
+            .count();
+    if (elapsed < cooldown_seconds) {
+      return {false, "Cooldown active. Wait " +
+                         to_string(cooldown_seconds - elapsed) + "s"};
+    }
+
+    return {true, "OK"};
+  }
+
+  // Core Processing
+  string process_tick(const string &tick_json) {
+    try {
+      auto tick = json::parse(tick_json);
+      string symbol = tick["symbol"];
+      double price = tick["quote"];
+
+      // Update cache
+      price_cache[symbol] = price;
+
+      // Return analysis
+      json result;
+      result["symbol"] = symbol;
+      result["price"] = price;
+      result["signal"] = 0.5; // Neutral
+
+      return result.dump();
+
+    } catch (const exception &e) {
+      return "{\"error\": \"" + string(e.what()) + "\"}";
+    }
+  }
+
+  // Unified Trade Execution Interface
+  string execute_trade(const string &params_json) {
+    try {
+      auto params = json::parse(params_json);
+
+      string symbol = params["symbol"];
+      string action = params["action"];
+      double stake = params["stake"];
+      int active_trades = params.value("active_trades", 0);
+
+      // 1. Validate
+      ValidationResult val = validate_trade(stake, symbol, active_trades);
+
+      if (!val.valid) {
+        json error_res;
+        error_res["status"] = "rejected";
+        error_res["reason"] = val.error;
+        return error_res.dump();
+      }
+
+      // Update state
+      last_trade_time = std::chrono::steady_clock::now();
+
+      json success_res;
+      success_res["status"] = "approved";
+      success_res["symbol"] = symbol;
+      success_res["action"] = action;
+      success_res["stake"] = stake;
+
+      return success_res.dump();
+
+    } catch (const exception &e) {
+      json err;
+      err["status"] = "error";
+      err["message"] = e.what();
+      return err.dump();
+    }
+  }
+
+  // Set cooldown dynamically
+  void set_cooldown(int seconds) { cooldown_seconds = seconds; }
+
+  void set_bot_state(bool state) { is_running = state; }
+
+  string get_bot_state() {
+    json state;
+    state["is_running"] = is_running;
+
+    auto now = std::chrono::steady_clock::now();
+    auto uptime =
+        std::chrono::duration_cast<std::chrono::seconds>(now - start_time)
+            .count();
+    state["uptime_seconds"] = uptime;
+
+    return state.dump();
+  }
+};
+
+// Global Engine Instance
+TradingEngine engine;
+
+// --- C Exports for Python ctypes ---
 
 extern "C" {
 
-void init_engine(Config *config) {
-  if (config) {
-    g_config = *config;
-  }
-  g_state.is_running = false;
-  g_state.total_trades = 0;
-  g_state.total_pnl = 0.0;
-  g_state.uptime_seconds = 0;
-  g_state.current_drawdown = 0.0;
-  g_start_time = time(NULL);
+void init_engine(const char *config_json) { engine.initialize(config_json); }
+
+const char *process_tick(const char *tick_json) {
+  static string result;
+  result = engine.process_tick(tick_json);
+  return result.c_str();
 }
 
-void update_config(Config *config) {
-  if (config) {
-    std::cout << "[CPP] Config Updated. Grid Size: " << config->grid_size
-              << std::endl;
-    g_config = *config;
-  }
+const char *execute_trade(const char *params_json) {
+  static string result;
+  result = engine.execute_trade(params_json);
+  return result.c_str();
 }
 
-void update_account(AccountInfo *info) {
-  if (info) {
-    g_account = *info;
-  }
-}
+void set_cooldown(int seconds) { engine.set_cooldown(seconds); }
 
-void set_bot_state(bool running) {
-  g_state.is_running = running;
-  if (running && g_start_time == 0) {
-    g_start_time = time(NULL);
-  }
-  std::cout << "[CPP] Bot State: " << (running ? "RUNNING" : "STOPPED")
-            << std::endl;
-}
+void set_bot_state(bool state) { engine.set_bot_state(state); }
 
-BotState get_bot_state() {
-  if (g_state.is_running) {
-    g_state.uptime_seconds = time(NULL) - g_start_time;
-  }
-  return g_state;
-}
-
-Signal process_tick(Tick *tick, Position *positions, int num_positions) {
-  Signal sig;
-  std::memset(&sig, 0, sizeof(Signal));
-  sig.action = ACTION_NONE;
-
-  // 0. Safety Checks
-  if (!g_state.is_running || !tick)
-    return sig;
-
-  // 1. Drawdown Panic Check
-  double start_bal =
-      g_account.balance > 0 ? g_account.balance : g_account.equity;
-  double drawdown = (start_bal - g_account.equity) / start_bal * 100.0;
-  g_state.current_drawdown = drawdown;
-
-  if (drawdown >= g_config.drawdown_limit && g_config.drawdown_limit > 0) {
-    std::cout << "[CPP] PANIC! Drawdown limit reached: " << drawdown << "%"
-              << std::endl;
-    set_bot_state(false); // Stop bot
-    sig.action = ACTION_PANIC;
-    std::strcpy(sig.comment, "Max Drawdown Reached");
-    return sig;
-  }
-
-  // 2. Max Trades Check
-  if (num_positions >= g_config.max_open_trades) {
-    return sig; // No new trades
-  }
-
-  // 3. Grid Strategy Logic
-  // Simple Grid: If price crosses a grid line (modulo grid_size), buy or sell
-  // against trend (mean reversion) This is a simplified demo logic.
-
-  double mid_price = (tick->bid + tick->ask) / 2.0;
-  int grid_level = (int)(mid_price / g_config.grid_size);
-  double grid_line = grid_level * g_config.grid_size;
-  double dist = mid_price - grid_line;
-
-  // Determine if we are "close" to a grid line (within 5% of grid size)
-  double tolerance = g_config.grid_size * 0.05;
-
-  if (std::abs(dist) < tolerance) {
-    // Check if we already have a trade on this symbol
-    // For simplicity, verify we don't have a position opened "too close"
-    bool existing_trade_near = false;
-    for (int i = 0; i < num_positions; i++) {
-      if (std::abs(positions[i].open_price - mid_price) <
-          (g_config.grid_size / 2.0)) {
-        existing_trade_near = true;
-        break;
-      }
-    }
-
-    if (!existing_trade_near) {
-      // Mean Reversion Grid:
-      // If price is ABOVE line, SELL (expect return to line)
-      // If price is BELOW line, BUY (expect return to line)
-      // (Note: Real grid strategies are more complex, this is "Vision"
-      // compliant MVP)
-
-      double lots =
-          calculate_lots(g_config.risk_percent, g_config.stop_loss_points);
-
-      // Randomize or Alternate for demo if no trend data
-      // For this vision: BUY if price < line (bounce up), SELL if price > line
-      // (bounce down) -> wait, dist does this. If dist > 0, price > line ->
-      // SELL If dist < 0, price < line -> BUY
-
-      double confidence = 1.0 - (std::abs(dist) / tolerance);
-      if (confidence < 0)
-        confidence = 0;
-
-      if (dist > 0) {
-        sig.action = ACTION_SELL;
-        sig.lots = lots;
-        sig.sl = tick->bid + g_config.stop_loss_points;
-        sig.tp = tick->bid - g_config.take_profit_points;
-        sig.confidence = confidence;
-        std::strcpy(sig.comment, "Grid Sell");
-      } else {
-        sig.action = ACTION_BUY;
-        sig.lots = lots;
-        sig.sl = tick->ask - g_config.stop_loss_points;
-        sig.tp = tick->ask + g_config.take_profit_points;
-        sig.confidence = confidence;
-        std::strcpy(sig.comment, "Grid Buy");
-      }
-
-      std::strcpy(sig.symbol, tick->symbol);
-    }
-  }
-
-  // 4. Scalp Logic (Optional Layer)
-  // If momentum is high (price change > X in last Y seconds) -> Follow Trend
-  // (Placeholder for V2)
-
-  return sig;
+const char *get_bot_state() {
+  static string result;
+  result = engine.get_bot_state();
+  return result.c_str();
 }
 }

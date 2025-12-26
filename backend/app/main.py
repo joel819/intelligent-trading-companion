@@ -4,6 +4,16 @@ from app.api import bot, accounts, settings, stream, logs, trades, market
 
 from contextlib import asynccontextmanager
 from app.services.deriv_connector import deriv_client
+import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,6 +48,10 @@ app.include_router(trades.router, prefix="", tags=["Trades"])
 # ML Router
 from app.api import ml
 app.include_router(ml.router, prefix="/ml", tags=["Machine Learning"])
+
+# Strategy Router
+from app.api import strategies
+app.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 
 @app.get("/")
 async def root():

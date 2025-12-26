@@ -58,6 +58,15 @@ export interface StrategySettings {
   maxOpenTrades: number;
   drawdownLimit: number;
   symbol: string;
+  // Advanced Settings
+  minATR: number;
+  maxATR: number;
+  minPips: number;
+  atrSpikeMultiplier: number;
+  rsiOversold: number;
+  rsiOverbought: number;
+  maxDailyLoss: number;
+  maxSLHits: number;
 }
 
 export interface Notification {

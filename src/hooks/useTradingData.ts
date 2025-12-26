@@ -3,6 +3,18 @@ import { api } from '@/api/client';
 import { Account, Position, LogEntry, Notification } from '@/types/trading';
 import { useState, useEffect } from 'react';
 
+// Define SkippedSignal type
+interface SkippedSignal {
+  tick_count: number;
+  reason: string;
+  symbol: string;
+  atr: number;
+  confidence: number;
+  regime: string;
+  volatility: string;
+  timestamp: string;
+}
+
 const MOCK_NOTIFICATIONS: Notification[] = [];
 
 export const useTradingData = () => {
@@ -14,6 +26,7 @@ export const useTradingData = () => {
     const [symbols, setSymbols] = useState<any[]>([]);
     const [selectedSymbol, setSelectedSymbol] = useState('R_100');
     const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+    const [skippedSignals, setSkippedSignals] = useState<SkippedSignal[]>([]);
 
     // 1. Fetch Bot status
     const { data: botStatus = {
@@ -118,8 +131,7 @@ export const useTradingData = () => {
 
     // 6. SSE Stream
     useEffect(() => {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-        const evtSource = new EventSource(`${apiUrl}/stream/feed/`);
+        const evtSource = new EventSource("/stream/feed/");
 
         evtSource.onmessage = (event) => {
             try {
@@ -141,6 +153,9 @@ export const useTradingData = () => {
                         if (!Array.isArray(old)) return old;
                         return old.map(acc => acc.id === data.data.account_id ? { ...acc, ...data.data } : acc);
                     });
+                }
+                if (data.type === 'signal_skipped') {
+                    setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
                 }
             } catch (e) {
                 console.error("SSE parse error", e);
@@ -167,6 +182,7 @@ export const useTradingData = () => {
         selectedSymbol,
         setSelectedSymbol,
         logs,
+        skippedSignals,
         botStatus,
         toggleBot: () => toggleBotMutation.mutate(botStatus.isRunning),
         executeTrade: (params: any) => executeTradeMutation.mutate(params),

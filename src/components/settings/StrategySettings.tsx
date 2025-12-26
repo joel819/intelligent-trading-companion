@@ -26,6 +26,14 @@ const defaultSettings: StrategySettingsType = {
   maxOpenTrades: 5,
   drawdownLimit: 10,
   symbol: 'R_100',
+  minATR: 0.0003,
+  maxATR: 0.01,
+  minPips: 5.0,
+  atrSpikeMultiplier: 3.0,
+  rsiOversold: 30.0,
+  rsiOverbought: 70.0,
+  maxDailyLoss: 5.0,
+  maxSLHits: 3,
 };
 
 export const StrategySettings = () => {
@@ -181,6 +189,117 @@ export const StrategySettings = () => {
               onChange={(e) => setSettings({ ...settings, maxLots: Number(e.target.value) })}
               className="font-mono"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="maxDailyLoss">Max Daily Loss (%)</Label>
+            <Input
+              id="maxDailyLoss"
+              type="number"
+              step="0.1"
+              value={settings.maxDailyLoss}
+              onChange={(e) => setSettings({ ...settings, maxDailyLoss: Number(e.target.value) })}
+              className="font-mono"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="maxSLHits">Max SL Hits/Day</Label>
+            <Input
+              id="maxSLHits"
+              type="number"
+              value={settings.maxSLHits}
+              onChange={(e) => setSettings({ ...settings, maxSLHits: Number(e.target.value) })}
+              className="font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Intelligence Settings */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Market Intelligence</h4>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="minATR">Min ATR</Label>
+              <Input
+                id="minATR"
+                type="number"
+                step="0.0001"
+                value={settings.minATR}
+                onChange={(e) => setSettings({ ...settings, minATR: Number(e.target.value) })}
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxATR">Max ATR</Label>
+              <Input
+                id="maxATR"
+                type="number"
+                step="0.0001"
+                value={settings.maxATR}
+                onChange={(e) => setSettings({ ...settings, maxATR: Number(e.target.value) })}
+                className="font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="minPips">Min Candle Body (Pips)</Label>
+            <Input
+              id="minPips"
+              type="number"
+              value={settings.minPips}
+              onChange={(e) => setSettings({ ...settings, minPips: Number(e.target.value) })}
+              className="font-mono"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="spikeMultiplier">ATR Spike Multiplier</Label>
+            <Input
+              id="spikeMultiplier"
+              type="number"
+              step="0.5"
+              value={settings.atrSpikeMultiplier}
+              onChange={(e) => setSettings({ ...settings, atrSpikeMultiplier: Number(e.target.value) })}
+              className="font-mono"
+            />
+          </div>
+        </div>
+
+        {/* Signal Sensitivity */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">Signal Sensitivity</h4>
+
+          <div className="flex flex-col gap-6">
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <Label>RSI Oversold Level</Label>
+                <span className="font-mono text-sm text-green-500">{settings.rsiOversold}</span>
+              </div>
+              <Slider
+                value={[settings.rsiOversold]}
+                onValueChange={(value) => setSettings({ ...settings, rsiOversold: value[0] })}
+                max={50}
+                min={10}
+                step={1}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <Label>RSI Overbought Level</Label>
+                <span className="font-mono text-sm text-red-500">{settings.rsiOverbought}</span>
+              </div>
+              <Slider
+                value={[settings.rsiOverbought]}
+                onValueChange={(value) => setSettings({ ...settings, rsiOverbought: value[0] })}
+                max={90}
+                min={50}
+                step={1}
+              />
+            </div>
           </div>
         </div>
 

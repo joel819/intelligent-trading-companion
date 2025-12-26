@@ -27,3 +27,17 @@ backend/logs/
 *.lib
 *.obj
 cpp_engine/libengine.so
+
+# Logs
+*.log
+backend_run.log
+backend_debug.log
+frontend_run.log
+frontend_debug.log
+
+# Test files
+test_*.py
+temp_*/
+
+# Gemini artifacts (optional - keep local)
+.gemini/

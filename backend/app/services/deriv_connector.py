@@ -26,8 +26,10 @@ class DerivConnector:
         if not self.token:
             logger.warning("No DERIV_TOKEN found in environment. Connection may fail.")
         self.ws = None
+        self.ws = None
         self.is_connected = False
-        self.active_symbols = ["R_100", "R_75", "R_50"] 
+        self.is_authorized = False
+        self.active_symbols = ["R_10", "R_100", "R_75", "R_50"] 
         self.active_requests: Dict[str, asyncio.Future] = {} 
         self.listen_task: Optional[asyncio.Task] = None
         
@@ -37,9 +39,9 @@ class DerivConnector:
         self.current_account: Dict = {}
         self.open_positions: List[Dict] = []
         
-        self.req_id_counter = 100 # Start higher to avoid collision with builtin reqs
+        self.req_id_counter = 100 
         self.tick_count = 0
-        self.target_symbol = "R_100"
+        self.target_symbol = "R_10" # Defaulting to R_10 per user request
         self.processed_contracts = set()
         
         # Session Stats
@@ -49,18 +51,106 @@ class DerivConnector:
             "wins": 0,
             "losses": 0
         }
+
+        # --- ZONE UPGRADES INITIALIZATION ---
+        from app.intelligence import RegimeDetector, VolatilityFilter
+        from app.signals import MarketStructure, IndicatorLayer, EntryValidator
+        from app.exits import SmartStopLoss, DynamicTakeProfit
+        from app.risk import WeightedLotCalculator, RiskGuard, CooldownManager
+        from app.strategies import strategy_manager
         
-        # Default Config for Engine Initialization
+        # Intelligence
+        self.regime_detector = RegimeDetector()
+        # More permissive volatility settings for increased trade frequency
+        self.volatility_filter = VolatilityFilter(
+            min_atr_threshold=0.0,     # Allow zero ATR for startup period
+            max_atr_threshold=0.02,     # Higher maximum ATR
+            min_candle_body_pips=0.0,  # Allow zero candle body for synthetic indices
+            atr_spike_multiplier=10.0   # Much higher spike tolerance
+        )
+        
+        # Signals
+        self.market_structure = MarketStructure()
+        self.indicator_layer = IndicatorLayer()
+        self.entry_validator = EntryValidator()
+        
+        # Exits
+        self.smart_sl = SmartStopLoss()
+        self.dynamic_tp = DynamicTakeProfit()
+        
+        # Risk
+        self.lot_calculator = WeightedLotCalculator()
+        self.risk_guard = RiskGuard()
+        # Reduced cooldown for increased trade frequency (30 seconds instead of 60)
+        self.cooldown_manager = CooldownManager(default_cooldown_seconds=30)
+        
+        # Strategy
+        self.strategy_manager = strategy_manager
+        
+        # Local Contract Memory (SL/TP Tracking)
+        self.contract_metadata: Dict[str, Dict] = {}
+        
+        # Initialize C++ Engine with new JSON config
+        try:
+            EngineWrapper.init_engine(json.dumps({
+                "cooldown_seconds": 60,
+                "max_active_trades": 10
+            }))
+            logger.info("C++ Engine Initialized via Wrapper")
+        except Exception as e:
+            logger.error(f"Failed to init C++ Engine: {e}")
+
+        # Default Config
         self.default_config = {
             "grid_size": 10,
             "risk_percent": 1.0,
             "max_lots": 5.0,
-            "confidence_threshold": 0.7,
+            "confidence_threshold": 0.4,
             "stop_loss_points": 50.0,
             "take_profit_points": 100.0,
             "max_open_trades": 5,
-            "drawdown_limit": 10.0
+            "drawdown_limit": 10.0,
+            # Advanced Settings - Wider ATR range for R_10 compatibility
+            "min_atr": 0.0,
+            "max_atr": 1.0,
+            "min_pips": 0.0,
+            "atr_spike_multiplier": 20.0,
+            "rsi_oversold": 30.0,
+            "rsi_overbought": 70.0,
+            "max_daily_loss": 5.0,
+            "max_sl_hits": 3
         }
+        
+        # Apply initial config
+        self.apply_config_updates(self.default_config)
+
+    def apply_config_updates(self, config: Dict[str, Any]):
+        """Apply dynamic configuration updates to sub-services."""
+        # Update Volatility Filter
+        if hasattr(self.volatility_filter, 'update_params'):
+            self.volatility_filter.update_params(
+                min_atr = config.get("min_atr"),
+                max_atr = config.get("max_atr"),
+                min_pips = config.get("min_pips"),
+                spike_multiplier = config.get("atr_spike_multiplier")
+            )
+            
+        # Update Risk Guard
+        if hasattr(self.risk_guard, 'update_params'):
+            self.risk_guard.update_params(
+                max_daily_loss_percent = config.get("max_daily_loss"),
+                max_sl_hits = config.get("max_sl_hits"),
+                max_active_trades = config.get("max_open_trades")
+            )
+            
+        # Update Indicator Layer (RSI levels)
+        if hasattr(self.indicator_layer, 'update_params'):
+            self.indicator_layer.update_params(
+                rsi_oversold = config.get("rsi_oversold"),
+                rsi_overbought = config.get("rsi_overbought")
+            )
+            
+        logger.info("Dynamic configuration applied to sub-services.")
 
     async def connect(self):
         try:
@@ -118,7 +208,7 @@ class DerivConnector:
             
             # Bootstrap Engine with Default Config
             try:
-                EngineWrapper.init_engine(self.default_config)
+                EngineWrapper.init_engine(json.dumps(self.default_config))
                 logger.info("Trading Engine Initialized with Default Config")
             except Exception as e:
                 logger.error(f"Failed to initialize trading engine: {e}")
@@ -145,6 +235,7 @@ class DerivConnector:
                 loginid = auth_data.get('loginid')
                 fullname = auth_data.get('fullname')
                 msg = f"Backend Authorized as {fullname} ({loginid})"
+                self.is_authorized = True
                 logger.info(msg)
                 
                 await stream_manager.broadcast_log({
@@ -163,6 +254,11 @@ class DerivConnector:
                     "email": auth_data.get("email")
                 }
                 self.active_account_id = self.current_account["id"]
+                
+                # Initialize Start Balance for Risk Guard
+                if not hasattr(self, 'start_balance') or self.start_balance is None:
+                    self.start_balance = self.current_account["balance"]
+                    logger.info(f"Bot Session Start Balance Initialized: ${self.start_balance}")
                 
                 # Parse Account List
                 raw_list = auth_data.get("account_list", [])
@@ -259,7 +355,7 @@ class DerivConnector:
         try:
             logger.info(f">>> SENDING: {request}")
             await self.ws.send(json.dumps(request))
-            response = await asyncio.wait_for(future, timeout=30.0) 
+            response = await asyncio.wait_for(future, timeout=60.0) 
             logger.info(f">>> GOT RESPONSE FOR {req_id}")
             return response
         except asyncio.TimeoutError:
@@ -326,83 +422,202 @@ class DerivConnector:
     async def handle_tick(self, tick):
         symbol = tick['symbol']
         bid = tick['quote']
-        ask = tick['quote']
         epoch = tick['epoch']
         
         tick_data = {
             "symbol": symbol,
             "bid": float(bid),
-            "ask": float(ask),
+            "ask": float(bid), # Simplified for synthetic
             "timestamp": datetime.fromtimestamp(epoch).isoformat(),
-            "spread": 0
         }
         
         self.tick_count += 1
-        symbol = tick_data.get('symbol')
         
-        # Filter: Only trade on target symbol
         if symbol != self.target_symbol:
             return
 
-        if self.tick_count % 50 == 0:
-            logger.info(f"Received 50 ticks for {symbol}. Last price: {tick_data.get('bid')}")
-        
+        if self.tick_count % 10 == 0:
+            logger.info(f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Vol: {self.regime_detector.current_regime.get('volatility')} | Regime: {self.regime_detector.current_regime.get('regime')}")
+
+        # Broadcast raw tick for chart
         await stream_manager.broadcast_tick(tick_data)
         
+        skip_reason = None
         try:
-            # Pass REAL open positions to the engine
-            signal = EngineWrapper.process_tick(tick_data, self.open_positions)
+            # --- PHASE 1: MARKET INTELLIGENCE ---
+            # 1. Update Market Data Once
+            tick_for_algo = {'quote': float(bid), 'epoch': epoch}
+            regime_data = self.regime_detector.update(tick_for_algo)
             
-            # DEBUG: Trace Engine Signal
-            if self.tick_count % 10 == 0:
-                is_running = EngineWrapper.get_bot_state()['is_running']
-                logger.info(f"Engine Signal: {signal['action']} | Bot Running: {is_running}")
+            current_regime = regime_data.get('regime', 'unknown')
+            current_volatility = regime_data.get('volatility', 'unknown')
+            atr_val = regime_data.get('atr', 0.0)
             
-            action = signal.get('action', 0)
-            confidence = float(signal.get('confidence', 0.0))
-            threshold = float(self.default_config.get('confidence_threshold', 0.0)) * 100
-
-            # 1. Panic Signal (Action 5) - Highest Priority
-            if action == 5:
-                logger.critical(f"PANIC STOP TRIGGERED BY ENGINE for {symbol}")
-                await stream_manager.broadcast_log({
-                    "id": str(uuid.uuid4()),
-                    "timestamp": datetime.now().isoformat(),
-                    "message": "!!! PANIC STOP TRIGGERED !!!",
-                    "level": "error",
-                    "source": "Engine"
+            # --- BROADCAST MARKET STATUS (Throttled) ---
+            if self.tick_count % 5 == 0:
+                await stream_manager.broadcast_event('market_status', {
+                    "regime": current_regime,
+                    "volatility": current_volatility,
+                    "active_strategy": self.strategy_manager.get_active_strategy_name(),
+                    "symbol": symbol
                 })
-                # Add stop bot logic if desired
-                return
 
-            # 2. Trading Signals (Buy=1, Sell=2)
-            if action in [1, 2]:
-                # Log the signal attempt
-                logger.info(f"[ENGINE] Signal Received: {action} | Confidence: {confidence}% | Threshold: {threshold}%")
+            # 2. Filter Volatility
+            is_vol_valid, block_reason = self.volatility_filter.is_valid(tick_for_algo, atr_val)
+            
+            if not is_vol_valid:
+                skip_reason = f"Volatility Filter Blocked: {block_reason}"
+
+            # --- PHASE 2: SIGNAL GENERATION ---
+            # 3. Analyze Market Structure & Indicators
+            structure_data = self.market_structure.analyze(tick_for_algo)
+            indicator_data = self.indicator_layer.analyze(tick_for_algo)
+            
+            # 4. Run Active Strategy
+            strategy_signal = self.strategy_manager.run_strategy(
+                tick_for_algo, regime_data, structure_data, indicator_data
+            )
+            
+            # Detailed Signal Logic (For Visibility)
+            final_confidence = 0.0
+            is_safe = False
+            
+            if strategy_signal:
+                action = strategy_signal['action']
+                s_score = structure_data.get('score', 50)
+                i_score = indicator_data.get('score', 50)
                 
-                # Confidence Threshold Check
-                if confidence < threshold:
-                    logger.warning(f"[ENGINE] Trade Ignored: {confidence}% < {threshold}%")
-                    await stream_manager.broadcast_log({
-                        "id": str(uuid.uuid4()),
-                        "timestamp": datetime.now().isoformat(),
-                        "message": f"Signal Skipped (Low Confidence): {confidence}% < {threshold}%",
-                        "level": "warn",
-                        "source": "Engine"
-                    })
+                # Validate entry with structure and indicators
+                entry_signal = self.entry_validator.validate(
+                    structure_data, indicator_data, is_vol_valid
+                )
+                
+                if not entry_signal:
+                    skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
+                else:
+                    final_confidence = entry_signal['confidence']
+                    action = entry_signal['action']
+                    
+                    # Reasonable confidence thresholds for production
+                    if current_volatility == "extreme":
+                        threshold = 0.4  # Moderate threshold for extreme volatility
+                    elif current_volatility == "high":
+                        threshold = 0.3  # Lower threshold for high volatility
+                    else:
+                        threshold = 0.2  # Even lower for normal conditions
+                        
+                    if final_confidence < threshold:
+                        skip_reason = f"Low Confidence: {final_confidence:.2f} < {threshold} (Scores: S={s_score}, I={i_score})"
+                    elif strategy_signal['action'] != entry_signal['action']:
+                        skip_reason = f"Signal Conflict: Strategy={strategy_signal['action']} vs Validator={entry_signal['action']}"
+                    else:
+                        # --- PHASE 3: RISK MANAGEMENT ---
+                        # 6. Check Risk Guards (Daily Loss, etc.)
+                        start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
+                        is_safe, guard_msg = self.risk_guard.check_trade_allowed(
+                            self.current_account.get('balance', 0.0),
+                            start_bal,
+                            len(self.open_positions),
+                            current_volatility,
+                            self.is_authorized
+                        )
+                        
+                        if not is_safe:
+                            skip_reason = f"Risk Guard Blocked: {guard_msg}"
+                        else:
+                            # 7. Check Cooldown
+                            if not self.cooldown_manager.can_trade():
+                                skip_reason = "Cooldown Manager: Interval Active"
+            else:
+                if not skip_reason: skip_reason = "No Strategy Signal (RSI/Momentum not met)"
+
+            # Enhanced logging for all skipped signals - more visibility
+            if skip_reason:
+                # Log every skip with detailed information
+                logger.warning(f"[SIGNAL SKIPPED] Tick {self.tick_count}: {skip_reason}")
+                logger.info(f"[SIGNAL DETAILS] Symbol: {symbol}, ATR: {atr_val:.6f}, Confidence: {final_confidence:.2f}, Regime: {current_regime}")
+                
+                # Broadcast skipped signal to frontend for visibility
+                await stream_manager.broadcast_event('signal_skipped', {
+                    "tick_count": self.tick_count,
+                    "reason": skip_reason,
+                    "symbol": symbol,
+                    "atr": atr_val,
+                    "confidence": final_confidence,
+                    "regime": current_regime,
+                    "volatility": current_volatility,
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+                # Throttle return to avoid blocking, but log everything
+                if self.tick_count % 5 == 0:
+                    return
+                else:
                     return
 
-                # Execute
-                logger.info(f"[ENGINE] Executing Automated Trade: {action} on {symbol}")
+
+            # --- PHASE 4: EXECUTION SETUP ---
+            action = entry_signal['action'] # "BUY" or "SELL"
+            
+            # 8. Smart Exits
+            momentum_factor = 1.0
+            if action == "BUY":
+                momentum_factor = max(0.5, indicator_data.get('score', 50) / 50.0)
+            else: # SELL
+                momentum_factor = max(0.5, (100 - indicator_data.get('score', 50)) / 50.0)
+            
+            sl_price = self.smart_sl.calculate_sl_price(float(bid), action, atr_val)
+            tp_price = self.dynamic_tp.calculate_tp_price(float(bid), sl_price, action, momentum_factor=momentum_factor)
+            
+            # 9. Weighted Lot Sizing
+            risk_pct = self.default_config.get('riskPercent', 1.0)
+            risk_amount = self.lot_calculator.calculate_lot_size(
+                self.current_account.get('balance', 0.0),
+                risk_pct,
+                final_confidence,
+                current_regime,
+                volatility=current_volatility,
+                symbol=symbol
+            )
+            
+            stake = max(0.35, risk_amount) # Min stake
+
+            # --- PHASE 5: EXECUTION (C++ Engine Validation) ---
+            trade_params = {
+                "symbol": symbol,
+                "action": action,
+                "stake": stake,
+                "active_trades": len(self.open_positions)
+            }
+            
+            # Verify with C++ Engine (Safety Layer)
+            execution_result_json = EngineWrapper.execute_trade(json.dumps(trade_params))
+            result = json.loads(execution_result_json)
+            
+            if result.get("status") == "approved":
+                # Execute Real Trade
+                metadata = {
+                    "strategy": self.strategy_manager.get_active_strategy_name(),
+                    "regime": current_regime,
+                    "confidence": final_confidence,
+                    "stop_loss": sl_price,
+                    "take_profit": tp_price
+                }
+                
                 await self.execute_buy(
                     symbol=symbol,
-                    contract_type="CALL" if action == 1 else "PUT",
-                    amount=signal.get('lots', 0.35),
-                    metadata={"source": "Engine", "signal": signal}
+                    contract_type="CALL" if action == "BUY" else "PUT",
+                    amount=stake,
+                    metadata=metadata
                 )
+                
+                # Record cooldown
+                self.cooldown_manager.record_trade()
+            else:
+                logger.warning(f"C++ Engine Rejected: {result.get('reason')}")
             
         except Exception as e:
-            logger.error(f"Engine/Trade Activity Error: {e}")
+            logger.error(f"Error in handle_tick: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
@@ -433,8 +648,16 @@ class DerivConnector:
                 logger.warning("Trade Rejected by FIFO Validation Guard")
                 return {"status": "error", "message": "FIFO Validation Rejected"}
                 
-            # 3. Create Proposal
-            proposal_req = TradeManager.create_proposal_payload(validated_params)
+            # 3. Create Proposal with SL/TP
+            # Extract SL/TP from metadata if available
+            sl_price = metadata.get('stop_loss') if metadata else None
+            tp_price = metadata.get('take_profit') if metadata else None
+            
+            # Log SL/TP values for verification
+            if sl_price or tp_price:
+                logger.info(f"Trade will include native Deriv SL/TP: SL={sl_price}, TP={tp_price}")
+            
+            proposal_req = TradeManager.create_proposal_payload(validated_params, sl_price, tp_price)
             proposal_resp = await self.send_request(proposal_req)
             
             if 'proposal' in proposal_resp:
@@ -465,6 +688,19 @@ class DerivConnector:
                     "source": "Execution"
                 })
                 
+                # Record for tracking
+                if metadata:
+                    cid = str(buy_resp['buy']['contract_id'])
+                    self.contract_metadata[cid] = {
+                        "contract_id": cid,
+                        "symbol": symbol,
+                        "action": action,
+                        "entry_price": float(buy_resp['buy']['buy_price']),
+                        "stop_loss": metadata.get('stop_loss'),
+                        "take_profit": metadata.get('take_profit'),
+                        "strategy": metadata.get('strategy')
+                    }
+
                 return {"status": "success", "data": buy_resp['buy']}
             else:
                 from app.services.audit_logger import audit_logger
@@ -535,6 +771,8 @@ class DerivConnector:
         if is_sold:
             # Remove from active positions
             self.open_positions = [p for p in self.open_positions if p['id'] != cid]
+            # Cleanup metadata
+            self.contract_metadata.pop(cid, None)
         else:
             # Update or Add position
             pos = {
@@ -547,6 +785,46 @@ class DerivConnector:
                 "pnl": float(contract.get('profit', 0)),
                 "openTime": datetime.fromtimestamp(contract.get('purchase_time', 0)).isoformat()
             }
+            
+            # Trailing & Exit Enforcement
+            metadata = self.contract_metadata.get(cid)
+            if metadata:
+                current_price = pos['currentPrice']
+                entry_price = metadata['entry_price']
+                current_sl = metadata['stop_loss']
+                current_tp = metadata['take_profit']
+                direction = metadata['action'] # "BUY" or "SELL"
+                
+                # Check Trailing Update
+                new_sl = self.dynamic_tp.check_trailing_update(
+                    current_price, entry_price, current_sl, direction
+                )
+                if new_sl:
+                    logger.info(f"Trailing SL Update for {cid}: {current_sl} -> {new_sl}")
+                    metadata['stop_loss'] = new_sl
+                    
+                # Local Enforcement (Automatic Exit)
+                should_exit = False
+                exit_reason = ""
+                
+                if direction == "BUY":
+                    if current_price <= current_sl:
+                        should_exit = True
+                        exit_reason = "Stop Loss Hit (Local)"
+                    elif current_price >= current_tp:
+                        should_exit = True
+                        exit_reason = "Take Profit Hit (Local)"
+                else: # SELL
+                    if current_price >= current_sl:
+                        should_exit = True
+                        exit_reason = "Stop Loss Hit (Local)"
+                    elif current_price <= current_tp:
+                        should_exit = True
+                        exit_reason = "Take Profit Hit (Local)"
+                        
+                if should_exit:
+                    logger.warning(f"Triggering Local Exit for {cid}: {exit_reason}")
+                    asyncio.create_task(self.sell_contract(cid, exit_reason))
             
             found = False
             for i, p in enumerate(self.open_positions):
@@ -589,6 +867,31 @@ class DerivConnector:
             })
                 
         await stream_manager.broadcast_event('positions', self.open_positions)
+
+    async def sell_contract(self, contract_id: str, reason: str = "Manual Exit"):
+        """Closes an open contract at market price."""
+        if not self.ws or not self.is_connected: return
+        
+        logger.info(f"Closing Contract {contract_id}. Reason: {reason}")
+        req = {
+            "sell": contract_id,
+            "price": 0 # 0 means market price
+        }
+        
+        resp = await self.send_request(req)
+        if 'error' in resp:
+            logger.error(f"Failed to close contract {contract_id}: {resp['error']}")
+            await stream_manager.broadcast_log({
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now().isoformat(),
+                "message": f"Exit Failed for {contract_id}: {resp['error'].get('message', 'Unknown Error')}",
+                "level": "error",
+                "source": "Execution"
+            })
+            return False
+            
+        logger.info(f"Contract {contract_id} closed successfully ({reason}).")
+        return True
 
     async def disconnect(self):
         self.is_connected = False

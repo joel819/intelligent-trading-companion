@@ -1,89 +1,42 @@
+/**
+ * Lightweight C interface for the JSON‑based trading engine.
+ *
+ * The Python side talks to these functions via ctypes. All complex
+ * data structures are passed as JSON strings to keep the ABI simple.
+ */
+
 #ifndef ENGINE_HPP
 #define ENGINE_HPP
 
 extern "C" {
 
-// --- Data Structures ---
+// Initialize / reset the engine with JSON configuration
+// Example: {"cooldown_seconds": 60, ...}
+void init_engine(const char *config_json);
 
-struct Config {
-  int grid_size;               // Distance between grid levels in points
-  double risk_percent;         // Risk per trade (% of equity)
-  double max_lots;             // Maximum lot size allowed
-  double confidence_threshold; // ML Confidence floor (0.0 - 1.0)
-  double stop_loss_points;     // SL distance
-  double take_profit_points;   // TP distance
-  int max_open_trades;         // Global limit
-  double drawdown_limit;       // Panic stop if equity drops below this %
-};
+// Hot‑reload configuration while running
+void update_config(const char *config_json);
 
-struct Tick {
-  double bid;
-  double ask;
-  unsigned long long epoch_time; // Unix timestamp
-  char symbol[16];               // e.g., "R_100"
-};
+// Update account information used internally for risk metrics
+// (balance, equity, margin_free)
+void update_account(double balance, double equity, double margin_free);
 
-struct AccountInfo {
-  double balance;
-  double equity;
-  double margin_free;
-};
+// Process a tick (JSON in, JSON out)
+// Example tick: {"symbol":"R_100","quote":123.45}
+const char *process_tick(const char *tick_json);
 
-enum ActionType {
-  ACTION_NONE = 0,
-  ACTION_BUY = 1,
-  ACTION_SELL = 2,
-  ACTION_CLOSE_BUY = 3,
-  ACTION_CLOSE_SELL = 4,
-  ACTION_PANIC = 5 // Internal panic trigger
-};
+// Unified trade execution + safety layer
+// Params JSON example:
+// {"symbol":"R_100","action":"BUY","stake":5.0,"active_trades":2,
+//  "symbol_available":true,"api_latency_ms":120.5,
+//  "rate_limit_warning":false,"api_error":""}
+const char *execute_trade(const char *params_json);
 
-struct Signal {
-  int action; // From ActionType enum
-  char symbol[16];
-  double lots;
-  double sl;
-  double tp;
-  double confidence; // Confidence score (0.0 - 1.0)
-  char comment[64];  // Reason for trade (e.g., "Grid Level 5")
-};
+// Runtime controls
+void set_cooldown(int seconds);
+void set_bot_state(bool state);
+const char *get_bot_state();
 
-struct Position {
-  long long ticket;
-  int type; // 0=Buy, 1=Sell
-  double open_price;
-  double volume;
-  double sl;
-  double tp;
-};
-
-// --- State Management ---
-struct BotState {
-  bool is_running;
-  int total_trades;
-  double total_pnl;
-  long long uptime_seconds;
-  double current_drawdown;
-};
-
-// --- Exported Functions ---
-
-// Initialize the engine (resets state)
-void init_engine(Config *config);
-
-// Hot-reload configuration without stopping
-void update_config(Config *config);
-
-// Update account info (needed for risk calc)
-void update_account(AccountInfo *info);
-
-// Process a new tick and return a Signal
-// Pass num_positions and array of Position structs to be stateless-ish
-Signal process_tick(Tick *tick, Position *positions, int num_positions);
-
-// Manual control
-void set_bot_state(bool running);
-BotState get_bot_state();
-}
+} // extern "C"
 
 #endif // ENGINE_HPP

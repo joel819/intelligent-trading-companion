@@ -67,11 +67,19 @@ class TradeManager:
         }
 
     @staticmethod
-    def create_proposal_payload(params: Dict[str, Any]) -> Dict[str, Any]:
+    def create_proposal_payload(params: Dict[str, Any], stop_loss: float = None, take_profit: float = None) -> Dict[str, Any]:
         """
-        Generates standard Deriv 'proposal' API request.
+        Generates standard Deriv 'proposal' API request with optional SL/TP.
+        
+        Args:
+            params: Validated trade parameters (symbol, amount, duration, etc.)
+            stop_loss: Optional stop loss price level
+            take_profit: Optional take profit price level
+            
+        Returns:
+            Deriv API proposal request payload
         """
-        return {
+        payload = {
             "proposal": 1,
             "subscribe": 1,
             "amount": params['amount'],
@@ -82,3 +90,22 @@ class TradeManager:
             "duration_unit": params['duration_unit'],
             "symbol": params['symbol']
         }
+        
+        # IMPORTANT: CALL/PUT contracts don't support limit_order in Deriv API
+        # SL/TP will be enforced locally by monitoring positions
+        contract_type = params['contract_type']
+        if contract_type not in ['CALL', 'PUT']:
+            # Add limit_order for SL/TP only for contract types that support it
+            if stop_loss or take_profit:
+                payload["limit_order"] = {}
+                if stop_loss:
+                    payload["limit_order"]["stop_loss"] = float(stop_loss)
+                    logger.info(f"Adding Stop Loss to proposal: {stop_loss}")
+                if take_profit:
+                    payload["limit_order"]["take_profit"] = float(take_profit)
+                    logger.info(f"Adding Take Profit to proposal: {take_profit}")
+        else:
+            logger.info(f"Skipping limit_order for {contract_type} - will use local SL/TP monitoring")
+        
+        return payload
+
