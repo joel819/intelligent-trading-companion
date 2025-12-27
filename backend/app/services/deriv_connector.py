@@ -153,24 +153,29 @@ class DerivConnector:
         logger.info("Dynamic configuration applied to sub-services.")
 
     async def connect(self):
-        try:
-            url = f"{DERIV_WS_BASE_URL}?app_id={self.app_id}"
-            logger.info(f"Connecting to {url}")
-            self.ws = await websockets.connect(url)
-            self.is_connected = True
-            logger.info("Connected to Deriv WebSocket")
-            
-            # Start listener
-            if self.listen_task:
-                self.listen_task.cancel()
-            self.listen_task = asyncio.create_task(self.listen())
-            
-            # Non-blocking initialization
-            asyncio.create_task(self.initialize_session())
-            
-        except Exception as e:
-            logger.error(f"Connection failed: {e}")
-            self.is_connected = False
+        while True:
+            try:
+                url = f"{DERIV_WS_BASE_URL}?app_id={self.app_id}"
+                logger.info(f"Connecting to {url}")
+                self.ws = await websockets.connect(url)
+                self.is_connected = True
+                logger.info("Connected to Deriv WebSocket")
+                
+                # Start listener
+                if self.listen_task:
+                    self.listen_task.cancel()
+                self.listen_task = asyncio.create_task(self.listen())
+                
+                # Non-blocking initialization
+                asyncio.create_task(self.initialize_session())
+                
+                # If we successfully connected and started listener, break the retry loop
+                break
+                
+            except Exception as e:
+                logger.error(f"Connection failed: {e}. Retrying in 5 seconds...")
+                self.is_connected = False
+                await asyncio.sleep(5)
 
     async def initialize_session(self):
         """Perform authorization and subscriptions in background."""
@@ -335,7 +340,7 @@ class DerivConnector:
                     "market": s['market_display_name']
                 }
                 for s in resp['active_symbols']
-                if s.get('market') in ['synthetic_index', 'forex']
+                if s.get('market') in ['synthetic_index', 'forex', 'derived']
             ]
             return symbols
         return []
@@ -365,9 +370,11 @@ class DerivConnector:
             self.active_requests.pop(req_id, None)
 
     async def listen(self):
+        logger.info("Listener Process Started")
         while self.is_connected and self.ws:
             try:
                 message = await self.ws.recv()
+                logger.info(f"RECVD: {message}")
                 data = json.loads(message)
                 # Check for req_id match in both top-level and echo_req
                 req_id = data.get('req_id')
@@ -413,11 +420,17 @@ class DerivConnector:
                     asyncio.create_task(self.handle_position_update(data['proposal_open_contract']))
                     
             except websockets.ConnectionClosed:
-                logger.warning("Connection closed")
+                logger.warning("Deriv WebSocket connection closed. Attempting reconnect...")
                 self.is_connected = False
+                asyncio.create_task(self.connect()) # Attempt reconnect
                 break
             except Exception as e:
-                logger.error(f"Error in listener: {e}")
+                logger.error(f"Error in Deriv listener: {e}")
+                # Don't break on generic errors, just continue listening if possible
+                if not self.ws or not self.is_connected:
+                    logger.warning("Listener lost connection, attempting reconnect...")
+                    asyncio.create_task(self.connect())
+                    break
 
     async def handle_tick(self, tick):
         symbol = tick['symbol']
@@ -455,10 +468,11 @@ class DerivConnector:
             
             # --- BROADCAST MARKET STATUS (Throttled) ---
             if self.tick_count % 5 == 0:
+                strategy_info = self.strategy_manager.get_active_strategy_info()
                 await stream_manager.broadcast_event('market_status', {
                     "regime": current_regime,
                     "volatility": current_volatility,
-                    "active_strategy": self.strategy_manager.get_active_strategy_name(),
+                    "active_strategy": strategy_info.get("name", "None"),
                     "symbol": symbol
                 })
 
@@ -468,19 +482,19 @@ class DerivConnector:
             if not is_vol_valid:
                 skip_reason = f"Volatility Filter Blocked: {block_reason}"
 
-            # --- PHASE 2: SIGNAL GENERATION ---
             # 3. Analyze Market Structure & Indicators
             structure_data = self.market_structure.analyze(tick_for_algo)
             indicator_data = self.indicator_layer.analyze(tick_for_algo)
             
             # 4. Run Active Strategy
             strategy_signal = self.strategy_manager.run_strategy(
-                tick_for_algo, regime_data, structure_data, indicator_data
+                symbol, tick_for_algo, regime_data, structure_data, indicator_data
             )
             
             # Detailed Signal Logic (For Visibility)
             final_confidence = 0.0
             is_safe = False
+            action = None
             
             if strategy_signal:
                 action = strategy_signal['action']
@@ -494,6 +508,7 @@ class DerivConnector:
                 
                 if not entry_signal:
                     skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
+                    action = None
                 else:
                     final_confidence = entry_signal['confidence']
                     action = entry_signal['action']
@@ -557,8 +572,13 @@ class DerivConnector:
 
 
             # --- PHASE 4: EXECUTION SETUP ---
-            action = entry_signal['action'] # "BUY" or "SELL"
-            
+            # Guard: If no valid action (skipped signal), do not proceed
+            if not action:
+                 if not skip_reason:
+                     skip_reason = "No Valid Action Determined"
+                 # Skip execution for this tick
+                 return
+
             # 8. Smart Exits
             momentum_factor = 1.0
             if action == "BUY":
@@ -596,8 +616,9 @@ class DerivConnector:
             
             if result.get("status") == "approved":
                 # Execute Real Trade
+                strategy_info = self.strategy_manager.get_active_strategy_info()
                 metadata = {
-                    "strategy": self.strategy_manager.get_active_strategy_name(),
+                    "strategy": strategy_info.get("name", "Unknown"),
                     "regime": current_regime,
                     "confidence": final_confidence,
                     "stop_loss": sl_price,
@@ -621,15 +642,20 @@ class DerivConnector:
             import traceback
             logger.error(traceback.format_exc())
 
-    async def execute_buy(self, symbol: str, contract_type: str, amount: float, metadata: dict = None):
+    async def execute_buy(self, symbol: str, contract_type: str, amount: float, duration: int = 5, duration_unit: str = 't', metadata: dict = None):
         """
         Executes a real trade on Deriv with FIFO validation.
         """
-        logger.info(f"Initiating Trade: {contract_type} on {symbol} for {amount}. Metadata: {metadata}")
+        logger.info(f"Initiating Trade: {contract_type} on {symbol} for {amount} ({duration}{duration_unit}). Metadata: {metadata}")
         
         try:
+            # Map symbols to API format
+            api_symbol = symbol
+            if symbol == "BOOM300": api_symbol = "BOOM300N"
+            elif symbol == "CRASH300": api_symbol = "CRASH300N"
+            
             # 1. FIFO Refresh (Get available contracts)
-            contracts_req = {"contracts_for": symbol}
+            contracts_req = {"contracts_for": api_symbol}
             contracts_resp = await self.send_request(contracts_req)
             
             if 'error' in contracts_resp:
@@ -640,8 +666,49 @@ class DerivConnector:
                 
             contracts = contracts_resp.get('contracts_for', {}).get('available', [])
             
+            # DEBUG: Log available contract types for this symbol
+            logger.info(f"Available Contracts for {symbol} (API: {api_symbol}): {[c['contract_type'] for c in contracts[:10]]}")
+            
+            # --- AUTO-SWITCH FOR BOOM/CRASH (Multipliers Only) ---
+            # If standard CALL/PUT is requested but not available, switch to MULTUP/MULTDOWN
+            effective_contract_type = contract_type
+            effective_duration = duration
+            effective_duration_unit = duration_unit
+            multiplier = None
+            
+            is_boom_crash = "BOOM" in api_symbol or "CRASH" in api_symbol
+            
+            if is_boom_crash:
+                # Boom/Crash often only supports Multipliers or Accumulators
+                if contract_type == "CALL":
+                    effective_contract_type = "MULTUP"
+                elif contract_type == "PUT":
+                    effective_contract_type = "MULTDOWN"
+                
+                # Multipliers don't use duration, they use 'multiplier' param
+                # We need to find valid multipliers from contracts
+                valid_multipliers = [c.get('multiplier') for c in contracts if c['contract_type'] == effective_contract_type]
+                if valid_multipliers:
+                     # Flatten list of lists if needed, or just pick first available options
+                     # Usually distinct contracts return list of allowed multipliers
+                     # We'll default to the lowest valid multiplier for safety (usually 10, 20, etc.)
+                     # But contracts response structure for multipliers is complex.
+                     # Simplified: Force multiplier=10 or 20
+                     multiplier = 20 
+                
+                logger.info(f"Auto-Switched Contract for {symbol}: {contract_type} -> {effective_contract_type} (Mult: {multiplier})")
+
             # 2. Validation & Clamping
-            mock_signal = {"symbol": symbol, "action": 1 if contract_type == "CALL" else 2, "lots": amount}
+            action_code = 1 if effective_contract_type in ["CALL", "MULTUP"] else 2
+            mock_signal = {
+                "symbol": api_symbol,
+                "action": action_code,
+                "lots": amount,
+                "duration": effective_duration,
+                "duration_unit": effective_duration_unit,
+                "contract_type": effective_contract_type,
+                "multiplier": multiplier
+            }
             validated_params = TradeManager.validate_and_clamp(mock_signal, contracts)
             
             if not validated_params:
@@ -680,6 +747,9 @@ class DerivConnector:
                     return {"status": "error", "message": buy_resp['error'].get('message', 'Trade Execution Failed')}
                 
                 # Broadcast success log
+                # Trigger immediate portfolio refresh to update UI positions
+                await self.send_request({"portfolio": 1})
+                
                 await stream_manager.broadcast_log({
                     "id": str(uuid.uuid4()),
                     "timestamp": datetime.now().isoformat(),
@@ -694,7 +764,7 @@ class DerivConnector:
                     self.contract_metadata[cid] = {
                         "contract_id": cid,
                         "symbol": symbol,
-                        "action": action,
+                        "action": "BUY" if action_code == 1 else "SELL",
                         "entry_price": float(buy_resp['buy']['buy_price']),
                         "stop_loss": metadata.get('stop_loss'),
                         "take_profit": metadata.get('take_profit'),
@@ -747,13 +817,19 @@ class DerivConnector:
         new_positions = []
         
         for c in raw_contracts:
+            contract_type = c.get('contract_type', '').upper()
+            
+            # Robust price mapping for initial portfolio state
+            entry_price = float(c.get('entry_tick') or c.get('entry_spot') or c.get('buy_price') or 0)
+            current_price = float(c.get('bid_price') or c.get('current_spot') or 0)
+            
             pos = {
                 "id": str(c.get('contract_id')),
                 "symbol": c.get('symbol'),
-                "side": 'buy' if 'CALL' in c.get('contract_type', '').upper() else 'sell',
+                "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
                 "lots": float(c.get('buy_price', 0)),
-                "entryPrice": float(c.get('entry_tick', 0)),
-                "currentPrice": float(c.get('bid_price', 0)),
+                "entryPrice": entry_price,
+                "currentPrice": current_price,
                 "pnl": float(c.get('profit', 0)),
                 "openTime": datetime.fromtimestamp(c.get('purchase_time', 0)).isoformat()
             }
@@ -775,56 +851,63 @@ class DerivConnector:
             self.contract_metadata.pop(cid, None)
         else:
             # Update or Add position
+            contract_type = contract.get('contract_type', '').upper()
+            # Correct price mapping for different contract states
+            entry_price = float(contract.get('entry_tick') or contract.get('entry_spot') or contract.get('buy_price') or 0)
+            current_price = float(contract.get('current_spot') or contract.get('bid_price') or 0)
+            
             pos = {
                 "id": cid,
                 "symbol": contract.get('underlying'),
-                "side": 'buy' if 'CALL' in contract.get('contract_type', '').upper() else 'sell',
+                "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
                 "lots": float(contract.get('buy_price', 0)),
-                "entryPrice": float(contract.get('entry_tick', 0)),
-                "currentPrice": float(contract.get('current_spot', 0)),
+                "entryPrice": entry_price,
+                "currentPrice": current_price,
                 "pnl": float(contract.get('profit', 0)),
                 "openTime": datetime.fromtimestamp(contract.get('purchase_time', 0)).isoformat()
             }
             
-            # Trailing & Exit Enforcement
-            metadata = self.contract_metadata.get(cid)
-            if metadata:
-                current_price = pos['currentPrice']
-                entry_price = metadata['entry_price']
-                current_sl = metadata['stop_loss']
-                current_tp = metadata['take_profit']
-                direction = metadata['action'] # "BUY" or "SELL"
-                
-                # Check Trailing Update
-                new_sl = self.dynamic_tp.check_trailing_update(
-                    current_price, entry_price, current_sl, direction
-                )
-                if new_sl:
-                    logger.info(f"Trailing SL Update for {cid}: {current_sl} -> {new_sl}")
-                    metadata['stop_loss'] = new_sl
+            # Trailing & Exit Enforcement (Wrapped for robustness)
+            try:
+                metadata = self.contract_metadata.get(cid)
+                if metadata:
+                    current_sl = metadata.get('stop_loss')
+                    current_tp = metadata.get('take_profit')
+                    direction = metadata.get('action') # "BUY" or "SELL"
                     
-                # Local Enforcement (Automatic Exit)
-                should_exit = False
-                exit_reason = ""
-                
-                if direction == "BUY":
-                    if current_price <= current_sl:
-                        should_exit = True
-                        exit_reason = "Stop Loss Hit (Local)"
-                    elif current_price >= current_tp:
-                        should_exit = True
-                        exit_reason = "Take Profit Hit (Local)"
-                else: # SELL
-                    if current_price >= current_sl:
-                        should_exit = True
-                        exit_reason = "Stop Loss Hit (Local)"
-                    elif current_price <= current_tp:
-                        should_exit = True
-                        exit_reason = "Take Profit Hit (Local)"
+                    if current_sl is not None and direction:
+                        # Check Trailing Update
+                        new_sl = self.dynamic_tp.check_trailing_update(
+                            current_price, entry_price, current_sl, direction
+                        )
+                        if new_sl:
+                            logger.info(f"Trailing SL Update for {cid}: {current_sl} -> {new_sl}")
+                            metadata['stop_loss'] = new_sl
+                            
+                        # Local Enforcement (Automatic Exit)
+                        should_exit = False
+                        exit_reason = ""
                         
-                if should_exit:
-                    logger.warning(f"Triggering Local Exit for {cid}: {exit_reason}")
-                    asyncio.create_task(self.sell_contract(cid, exit_reason))
+                        if direction == "BUY":
+                            if current_price <= current_sl:
+                                should_exit = True
+                                exit_reason = "Stop Loss Hit (Local)"
+                            elif current_tp and current_price >= current_tp:
+                                should_exit = True
+                                exit_reason = "Take Profit Hit (Local)"
+                        else: # SELL
+                            if current_price >= current_sl:
+                                should_exit = True
+                                exit_reason = "Stop Loss Hit (Local)"
+                            elif current_tp and current_price <= current_tp:
+                                should_exit = True
+                                exit_reason = "Take Profit Hit (Local)"
+                                
+                        if should_exit:
+                            logger.warning(f"Triggering Local Exit for {cid}: {exit_reason}")
+                            asyncio.create_task(self.sell_contract(cid, exit_reason))
+            except Exception as e:
+                logger.error(f"Error in Exit Guard for {cid}: {e}")
             
             found = False
             for i, p in enumerate(self.open_positions):
@@ -914,16 +997,26 @@ class DerivConnector:
             
         logger.info(f"Switching target symbol from {self.target_symbol} to {new_symbol}")
         
+        # Map user-friendly symbols to API format
+        api_symbol = new_symbol
+        if new_symbol in ["BOOM300", "BOOM_300"]: api_symbol = "BOOM300N"
+        elif new_symbol in ["CRASH300", "CRASH_300", "CRASH300S"]: api_symbol = "CRASH300N"
+        elif new_symbol == "R100": api_symbol = "R_100"
+        elif new_symbol == "R75": api_symbol = "R_75"
+        elif new_symbol == "R50": api_symbol = "R_50"
+        elif new_symbol == "R25": api_symbol = "R_25"
+        elif new_symbol == "R10": api_symbol = "R_10"
+        
         # Broadcast log
         await stream_manager.broadcast_log({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now().isoformat(),
-            "message": f"Trading symbol switched to: {new_symbol}",
+            "message": f"Trading symbol switched to: {api_symbol} ({new_symbol})",
             "level": "info",
             "source": "System"
         })
         
-        self.target_symbol = new_symbol
+        self.target_symbol = api_symbol
         
         # Subscriptions
         if new_symbol not in self.active_symbols:

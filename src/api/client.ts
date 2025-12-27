@@ -1,6 +1,7 @@
 import { StrategySettings } from '@/types/trading';
 
-const API_BASE = 'http://localhost:8001';
+
+const API_BASE = '/api';
 
 export const api = {
     bot: {
@@ -31,6 +32,15 @@ export const api = {
                 if (!res.ok) return null;
                 return res.json();
             } catch (e) { return null; }
+        },
+        setSymbol: async (symbol: string) => {
+            const res = await fetch(`${API_BASE}/settings/symbol`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol }),
+            });
+            if (!res.ok) throw new Error('Failed to switch symbol');
+            return res.json();
         },
         update: async (settings: Partial<StrategySettings>) => {
             const res = await fetch(`${API_BASE}/settings/`, {
@@ -65,14 +75,25 @@ export const api = {
             return res.json();
         }
     },
-    trade: async (params: any) => {
-        const res = await fetch(`${API_BASE}/trade/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params),
-        });
-        if (!res.ok) throw new Error('Failed to execute trade');
-        return res.json();
+    trade: {
+        execute: async (params: any) => {
+            const res = await fetch(`${API_BASE}/trade/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params),
+            });
+            if (!res.ok) throw new Error('Failed to execute trade');
+            return res.json();
+        },
+        close: async (contractId: string) => {
+            const res = await fetch(`${API_BASE}/trade/close/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contract_id: contractId }),
+            });
+            if (!res.ok) throw new Error('Failed to close position');
+            return res.json();
+        }
     },
     market: {
         getSymbols: async () => {

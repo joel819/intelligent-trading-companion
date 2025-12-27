@@ -66,14 +66,61 @@ class RiskGuard:
             pass
             
         # 5. Consecutive Losses (Cooldown)
-        if len(self.trade_history) >= 2 and self.trade_history[-2:] == ["loss", "loss"]:
-            return False, "2 consecutive losses - manual review suggested"
+        consecutive_losses = sum(1 for r in self.trade_history[-2:] if r == "loss") if len(self.trade_history) >= 2 else 0
+        if consecutive_losses >= 2:
+            return False, f"{consecutive_losses} consecutive losses - cooldown required"
             
         # 6. Active Trades Limit
         if active_trades_count >= self.max_active_trades:
             return False, f"Max active trades reached ({active_trades_count})"
             
         return True, "OK"
+    
+    def calculate_v10_stake(self, account_balance: float) -> float:
+        """
+        Calculate optimal stake size for V10 trading based on account balance.
+        
+        Args:
+            account_balance: Current account balance
+            
+        Returns:
+            Recommended stake size
+        """
+        if account_balance < 20:
+            return 0.5
+        elif account_balance <= 50:
+            return 1.0
+        else:
+            return 1.5
+    
+    def calculate_boom300_stake(self, account_balance: float) -> float:
+        """
+        Calculate optimal stake size for Boom 300 trading based on account balance.
+        
+        Args:
+            account_balance: Current account balance
+            
+        Returns:
+            Recommended stake size
+        """
+        if account_balance < 20:
+            return 0.35
+        elif account_balance <= 50:
+            return 0.70  # Mid-range between 0.5-1.0
+        else:
+            return 1.2
+    
+    def calculate_crash300_stake(self, account_balance: float) -> float:
+        """
+        Calculate optimal stake size for Crash 300 trading (same as Boom 300).
+        
+        Args:
+            account_balance: Current account balance
+            
+        Returns:
+            Recommended stake size
+        """
+        return self.calculate_boom300_stake(account_balance)
     
     def record_trade_result(self, result: str):
         """Record trade outcome ('win' or 'loss')."""

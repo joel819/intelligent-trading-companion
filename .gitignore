@@ -34,6 +34,7 @@ backend_run.log
 backend_debug.log
 frontend_run.log
 frontend_debug.log
+backend/backend_logs.txt
 
 # Test files
 test_*.py

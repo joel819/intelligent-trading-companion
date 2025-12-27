@@ -18,7 +18,7 @@ def get_status():
     
     # Determine Status String
     if not deriv_client.is_connected:
-        strategy_label = "Disconnected"
+        strategy_label = "Reconnecting..."
     elif not is_authorized:
         strategy_label = "Ready (Not Authorized)"
     else:

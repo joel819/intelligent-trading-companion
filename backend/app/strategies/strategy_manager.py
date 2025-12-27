@@ -1,65 +1,99 @@
 """
 Strategy Manager
-Manages loading, selecting, and executing trading strategies.
+Manages trading strategies with symbol-based selection.
+Simplified to use strategy_selector for multi-pair support.
 """
 
 from typing import Dict, Optional, List
 import logging
-from .base_strategy import BaseStrategy
-from .scalper import ScalperStrategy
-from .breakout import BreakoutStrategy
-from .v75_sniper import V75SniperStrategy
-from .grid_recovery import GridRecoveryStrategy
-from .spike_bot import SpikeBotStrategy
+from .strategy_selector import get_strategy, list_available_symbols, get_strategy_name
 
 logger = logging.getLogger(__name__)
 
 
 class StrategyManager:
-    """Manages multiple trading strategies."""
+    """Manages trading strategies with dynamic symbol-based routing."""
     
     def __init__(self):
-        self.strategies: Dict[str, BaseStrategy] = {}
-        self.active_strategy: Optional[BaseStrategy] = None
-        self._initialize_strategies()
+        self.current_symbol: Optional[str] = None
+        self.current_strategy = None
         
-    def _initialize_strategies(self):
-        """Initialize all available strategies with default configs."""
-        self.strategies["scalper"] = ScalperStrategy()
-        self.strategies["breakout"] = BreakoutStrategy()
-        self.strategies["v75_sniper"] = V75SniperStrategy()
-        self.strategies["grid_recovery"] = GridRecoveryStrategy()
-        self.strategies["spike_bot"] = SpikeBotStrategy()
+    def select_strategy_by_symbol(self, symbol: str) -> bool:
+        """
+        Select strategy based on trading symbol.
         
-        # Default active
-        self.active_strategy = self.strategies["scalper"]
-        
-    def select_strategy(self, strategy_name: str) -> bool:
-        """Switch the active strategy."""
-        if strategy_name in self.strategies:
-            self.active_strategy = self.strategies[strategy_name]
-            logger.info(f"Switched to strategy: {strategy_name}")
+        Args:
+            symbol: Trading symbol (e.g., "VOLATILITY_10", "BOOM_300")
+            
+        Returns:
+            True if strategy was successfully selected
+        """
+        try:
+            self.current_strategy = get_strategy(symbol)
+            self.current_symbol = symbol
+            strategy_name = get_strategy_name(symbol)
+            logger.info(f"Selected strategy: {strategy_name} for symbol: {symbol}")
             return True
-        return False
+        except ValueError as e:
+            logger.error(f"Failed to select strategy: {e}")
+            return False
+    
+    def get_active_strategy_info(self) -> Dict:
+        """Get information about the currently active strategy."""
+        if not self.current_strategy or not self.current_symbol:
+            return {
+                "symbol": None,
+                "strategy": None,
+                "name": None
+            }
         
-    def get_active_strategy_name(self) -> str:
-        return self.active_strategy.name if self.active_strategy else "None"
-        
+        return {
+            "symbol": self.current_symbol,
+            "strategy": self.current_strategy.name,
+            "name": get_strategy_name(self.current_symbol),
+            "config": self.current_strategy.config
+        }
+    
     def run_strategy(self, 
+                    symbol: str,
                     tick_data: Dict, 
                     regime_data: Dict, 
                     structure_data: Dict, 
                     indicator_data: Dict) -> Optional[Dict]:
-        """Run the analysis pipeline for the active strategy."""
-        if not self.active_strategy:
-            return None
-            
-        return self.active_strategy.analyze(
-            tick_data, 
-            regime_data, 
-            structure_data, 
-            indicator_data
-        )
+        """
+        Run strategy analysis for the given symbol.
         
-    def list_strategies(self) -> List[str]:
-        return list(self.strategies.keys())
+        Args:
+            symbol: Trading symbol
+            tick_data: Current market data
+            regime_data: Market regime info
+            structure_data: Market structure analysis
+            indicator_data: Technical indicators
+            
+        Returns:
+            Signal dictionary with action/confidence or None
+        """
+        # Auto-select strategy if symbol changed
+        if symbol != self.current_symbol:
+            if not self.select_strategy_by_symbol(symbol):
+                logger.error(f"Cannot run strategy - failed to select for symbol: {symbol}")
+                return None
+        
+        if not self.current_strategy:
+            logger.error("No strategy selected")
+            return None
+        
+        try:
+            return self.current_strategy.analyze(
+                tick_data, 
+                regime_data, 
+                structure_data, 
+                indicator_data
+            )
+        except Exception as e:
+            logger.error(f"Strategy execution error: {e}", exc_info=True)
+            return None
+    
+    def list_available_symbols(self) -> List[str]:
+        """Get list of all available trading symbols."""
+        return list_available_symbols()

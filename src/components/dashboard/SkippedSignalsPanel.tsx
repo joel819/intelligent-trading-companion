@@ -27,8 +27,11 @@ const reasonConfig = {
 
 export const SkippedSignalsPanel = ({ signals }: SkippedSignalsProps) => {
   const getReasonConfig = (reason: string) => {
+    // Debug incoming signals
+    console.log('[SkippedSignals] Rendering panel with signals:', signals);
+
     for (const key in reasonConfig) {
-      if (reason.includes(key)) {
+      if (reason && reason.toLowerCase().includes(key.toLowerCase())) {
         return reasonConfig[key as keyof typeof reasonConfig];
       }
     }
@@ -75,11 +78,11 @@ export const SkippedSignalsPanel = ({ signals }: SkippedSignalsProps) => {
                         {new Date(signal.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
-                    
+
                     <p className="text-sm text-foreground break-all mb-2">
                       {signal.reason}
                     </p>
-                    
+
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>ATR: {signal.atr.toFixed(6)}</span>
                       <span>Conf: {(signal.confidence * 100).toFixed(1)}%</span>

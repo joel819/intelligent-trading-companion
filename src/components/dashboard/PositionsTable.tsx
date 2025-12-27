@@ -1,4 +1,4 @@
-import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, XCircle, Loader2 } from 'lucide-react';
 import type { Position } from '@/types/trading';
 import { cn } from '@/lib/utils';
 import {
@@ -9,12 +9,35 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { useTradingData } from '@/hooks/useTradingData';
+import { useState } from 'react';
 
 interface PositionsTableProps {
   positions: Position[];
 }
 
 export const PositionsTable = ({ positions }: PositionsTableProps) => {
+  const { closePosition } = useTradingData();
+  const [closingIds, setClosingIds] = useState<Set<string>>(new Set());
+
+  const handleClose = async (id: string) => {
+    setClosingIds(prev => new Set(prev).add(id));
+    try {
+      await closePosition(id);
+    } finally {
+      // The table will re-render when the position is removed from state via WebSocket
+      // But we keep the loading state for a bit to be safe or until removed
+      setTimeout(() => {
+        setClosingIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 2000);
+    }
+  };
+
   if (positions.length === 0) {
     return (
       <div className="glass-card p-5 animate-fade-in">
@@ -39,6 +62,7 @@ export const PositionsTable = ({ positions }: PositionsTableProps) => {
               <TableHead className="text-muted-foreground text-right">Entry</TableHead>
               <TableHead className="text-muted-foreground text-right">Current</TableHead>
               <TableHead className="text-muted-foreground text-right">P&L</TableHead>
+              <TableHead className="text-muted-foreground text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -72,6 +96,21 @@ export const PositionsTable = ({ positions }: PositionsTableProps) => {
                   (position.pnl || 0) >= 0 ? "text-success" : "text-destructive"
                 )}>
                   {(position.pnl || 0) >= 0 ? '+' : ''}${(position.pnl || 0).toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleClose(position.id)}
+                    disabled={closingIds.has(position.id)}
+                  >
+                    {closingIds.has(position.id) ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

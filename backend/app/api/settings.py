@@ -29,6 +29,9 @@ class StrategySettings(BaseModel):
     maxDailyLoss: float = 5.0
     maxSLHits: int = 3
 
+class SymbolSwitchRequest(BaseModel):
+    symbol: str
+
 @router.get("/")
 def get_settings():
     # Return current config from deriv_client
@@ -73,6 +76,21 @@ async def update_token(req: dict):
     print(">>> BACKEND: Token updated and Reconnected.")
     
     return {"status": "success", "message": "Token updated and reconnecting..."}
+
+@router.post("/symbol")
+async def switch_symbol(req: SymbolSwitchRequest):
+    try:
+        if not req.symbol:
+            return {"status": "error", "message": "symbol is required"}
+
+        if req.symbol == deriv_client.target_symbol:
+            return {"status": "success", "symbol": deriv_client.target_symbol}
+
+        await deriv_client.switch_symbol(req.symbol)
+        return {"status": "success", "symbol": deriv_client.target_symbol}
+    except Exception as e:
+        logger.error(f"Failed to switch symbol: {e}")
+        return {"status": "error", "message": str(e)}
 
 @router.post("/")
 async def update_settings(settings: StrategySettings):

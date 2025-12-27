@@ -9,6 +9,7 @@ import { TickFeed } from '@/components/dashboard/TickFeed';
 import { LogsStream } from '@/components/dashboard/LogsStream';
 import { SkippedSignalsPanel } from '@/components/dashboard/SkippedSignalsPanel';
 import { StrategySettings } from '@/components/settings/StrategySettings';
+import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 import { AccountsList } from '@/components/accounts/AccountsList';
 // import { useMockData } from '@/hooks/useMockData';
@@ -57,6 +58,15 @@ const Index = () => {
 
   const [isBypassed, setIsBypassed] = useState(false);
   const displayAccount = selectedAccount;
+
+  // Debug Connection Logic
+  console.log('[DEBUG] Connection State:', {
+    strategy: botStatus.strategy,
+    isConnected: isConnected,
+    isAuthorized: botStatus.isAuthorized,
+    isBypassed
+  });
+
   const isConnecting = botStatus.strategy === "Connecting..." || (!isConnected && !isBypassed);
 
   if (activeTab === 'dashboard' && isConnecting && !isBypassed) {
@@ -166,7 +176,7 @@ const Index = () => {
                 <div className="space-y-6">
                   <BotControl status={botStatus} onToggle={toggleBot} />
                   <MarketStatusCard />
-                  <TickFeed ticks={ticks} />
+                  <TickFeed ticks={ticks.filter((t: any) => t?.symbol === selectedSymbol)} />
                 </div>
               </div>
             </div>
@@ -197,6 +207,7 @@ const Index = () => {
           {activeTab === 'settings' && (
             <div className="space-y-6 animate-fade-in max-w-4xl">
               <h2 className="text-xl font-semibold">Strategy Settings</h2>
+              <StrategySelector />
               <StrategySettings />
             </div>
           )}

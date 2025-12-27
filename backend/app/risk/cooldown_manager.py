@@ -54,3 +54,62 @@ class CooldownManager:
         
         remaining = duration - elapsed
         return max(0.0, remaining)
+    
+    def set_cooldown_for_v10_result(self, result: str, consecutive_losses: int = 0):
+        """
+        Set V10-specific cooldown based on trade result.
+        
+        Args:
+            result: "win" or "loss"
+            consecutive_losses: Number of consecutive losses
+        """
+        import random
+        
+        if consecutive_losses >= 2:
+            # After 2 consecutive losses: 50 minute block
+            cooldown = 3000  # 50 minutes
+            logger.warning(f"V10 Cooldown: {consecutive_losses} consecutive losses - setting 50min block")
+        elif result == "win":
+            # After win: 8-12 minutes random
+            cooldown = random.randint(480, 720)
+            logger.info(f"V10 Cooldown: Win - setting {cooldown}s ({cooldown/60:.1f}min) cooldown")
+        else:  # loss
+            # After loss: 15-20 minutes random
+            cooldown = random.randint(900, 1200)
+            logger.info(f"V10 Cooldown: Loss - setting {cooldown}s ({cooldown/60:.1f}min) cooldown")
+        
+        self.set_next_cooldown(cooldown)
+    
+    def set_cooldown_for_boom300_result(self, result: str, consecutive_losses: int = 0):
+        """
+        Set Boom 300-specific cooldown based on trade result.
+        
+        Args:
+            result: "win" or "loss"
+            consecutive_losses: Number of consecutive losses
+        """
+        if consecutive_losses >= 2:
+            # After 2 consecutive losses: 45 minute block
+            cooldown = 2700  # 45 minutes
+            logger.warning(f"Boom300 Cooldown: {consecutive_losses} consecutive losses - setting 45min block")
+        elif result == "win":
+            # After win: 12 minutes fixed
+            cooldown = 720
+            logger.info(f"Boom300 Cooldown: Win - setting {cooldown}s (12min) cooldown")
+        else:  # loss
+            # After loss: 20 minutes fixed
+            cooldown = 1200
+            logger.info(f"Boom300 Cooldown: Loss - setting {cooldown}s (20min) cooldown")
+        
+        self.set_next_cooldown(cooldown)
+    
+    def set_cooldown_for_crash300_result(self, result: str, consecutive_losses: int = 0):
+        """
+        Set Crash 300-specific cooldown (identical to Boom 300).
+        
+        Args:
+            result: "win" or "loss"
+            consecutive_losses: Number of consecutive losses
+        """
+        # Crash 300 uses same cooldowns as Boom 300
+        self.set_cooldown_for_boom300_result(result, consecutive_losses)

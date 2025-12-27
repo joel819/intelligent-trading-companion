@@ -40,6 +40,7 @@ export interface LogEntry {
 export interface BotStatus {
   isConnected: boolean;
   isRunning: boolean;
+  isAuthorized: boolean;
   strategy: string;
   lastTrade: string | null;
   uptime: number;
@@ -76,4 +77,15 @@ export interface Notification {
   message: string;
   timestamp: string;
   read: boolean;
+}
+
+export interface SkippedSignal {
+  tick_count: number;
+  reason: string;
+  symbol: string;
+  atr: number;
+  confidence: number;
+  regime: string;
+  volatility: string;
+  timestamp: string;
 }

@@ -38,8 +38,8 @@ class StreamManager:
         for queue in self.sse_queues:
             try:
                 await queue.put(message)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Broadcast Error (Queue): {e}")
 
     async def broadcast_tick(self, tick_data: dict):
         await self._broadcast({"type": "tick", "data": tick_data})

@@ -149,7 +149,19 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                                 isActive: true
                             });
 
-                            // Token sync with backend removed as backend is deprecated
+                            // Token sync with backend
+                            fetch('/api/accounts/add', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    token: activeAccount.token,
+                                    appId: activeAccount.appId
+                                })
+                            }).then(() => {
+                                console.log("[DerivContext] Token synced to backend");
+                            }).catch(err => {
+                                console.error("[DerivContext] Token sync failed", err);
+                            });
                         }
                     })
                     .catch(err => {

@@ -46,7 +46,7 @@ export const StrategySettings = () => {
     api.settings.get().then(data => {
       if (data) setSettings(data);
     }).catch(err => console.error("Failed to load settings", err));
-  }, []);
+  }, [selectedSymbol]);
 
   const handleSave = async () => {
     try {
@@ -97,7 +97,40 @@ export const StrategySettings = () => {
               <p className="text-sm text-muted-foreground">Select the market you want the bot to trade on</p>
             </div>
             <div className="w-[300px]">
-              <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+              <Select
+                value={selectedSymbol}
+                onValueChange={async (sym) => {
+                  try {
+                    // Update global state first
+                    setSelectedSymbol(sym);
+                    
+                    // Update settings endpoint
+                    await api.settings.setSymbol(sym);
+                    
+                    // Also update strategies endpoint to keep both in sync
+                    try {
+                      await fetch('/api/strategies/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol: sym })
+                      });
+                    } catch (e) {
+                      console.warn('Failed to sync with strategies endpoint:', e);
+                    }
+                    
+                    toast({
+                      title: "Symbol Synced",
+                      description: `Active symbol switched to ${sym}`,
+                    });
+                  } catch (e) {
+                    toast({
+                      title: "Error",
+                      description: "Failed to switch symbol on backend.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
                 <SelectTrigger className="w-full bg-background border-border">
                   <SelectValue placeholder="Search symbols..." />
                 </SelectTrigger>

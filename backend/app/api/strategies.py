@@ -1,80 +1,184 @@
+"""
+Strategies API
+Endpoints for strategy selection and management with symbol-based routing.
+"""
+
 from fastapi import APIRouter, HTTPException
-from typing import Dict, List, Any, Optional
-from app.strategies import strategy_manager
+from pydantic import BaseModel
+from typing import Optional, Dict
+import logging
+
+from app.strategies.strategy_selector import (
+    get_strategy,
+    list_strategies_for_ui,
+    list_strategies_for_ui,
+    get_strategy_name,
+    STRATEGY_MAP
+)
+from app.services.deriv_connector import deriv_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get("/list", response_model=List[str])
+class StrategySelectionRequest(BaseModel):
+    """Request model for strategy selection."""
+    symbol: str
+
+
+class StrategyAnalysisRequest(BaseModel):
+    """Request model for running strategy analysis."""
+    symbol: str
+    market_data: Dict
+    regime_data: Optional[Dict] = None
+    structure_data: Optional[Dict] = None
+    indicator_data: Optional[Dict] = None
+
+
+@router.get("/list")
 async def list_strategies():
-    """List all available strategies."""
-    return strategy_manager.list_strategies()
-
-
-@router.get("/active")
-async def get_active_strategy():
-    """Get the currently active strategy name."""
-    return {"active_strategy": strategy_manager.get_active_strategy_name()}
-
-
-@router.post("/select")
-async def select_strategy(request: Dict[str, str]):
-    """Select a strategy to activate."""
-    strategy_name = request.get("strategy")
-    if not strategy_name:
-        raise HTTPException(status_code=400, detail="Strategy name required")
-
-    success = strategy_manager.select_strategy(strategy_name)
-    if not success:
-        raise HTTPException(
-            status_code=404, detail=f"Strategy '{strategy_name}' not found"
-        )
-
-    return {"status": "success", "active_strategy": strategy_name}
-
-
-@router.get("/config")
-async def get_strategy_config():
-    """Get configuration of the active strategy."""
-    if not strategy_manager.active_strategy:
-        raise HTTPException(status_code=404, detail="No active strategy")
-
-    return strategy_manager.active_strategy.get_config()
-
-
-@router.post("/config")
-async def update_strategy_config(config: Dict[str, Any]):
-    """Update configuration of the active strategy."""
-    if not strategy_manager.active_strategy:
-        raise HTTPException(status_code=404, detail="No active strategy")
-
+    """
+    Get list of all available strategies for UI selection.
+    
+    Returns:
+        List of strategy information including symbol, name, description
+    """
     try:
-        strategy_manager.active_strategy.update_config(config)
+        strategies = list_strategies_for_ui()
         return {
-            "status": "success",
-            "config": strategy_manager.active_strategy.get_config(),
+            "success": True,
+            "strategies": strategies,
+            "count": len(strategies)
         }
     except Exception as e:
+        logger.error(f"Error listing strategies: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/run")
-async def run_strategy_pipeline(payload: Dict[str, Any]):
+@router.post("/select")
+async def select_strategy(request: StrategySelectionRequest):
     """
-    Run the active strategy's analysis pipeline once and return the raw signal.
-
-    This is primarily a diagnostics / backtesting helper – in live trading the
-    full pipeline is driven by the DerivConnector tick loop.
+    Select a strategy by trading symbol.
+    
+    Args:
+        request: Contains symbol name
+        
+    Returns:
+        Strategy information and configuration
     """
-    if not strategy_manager.active_strategy:
-        raise HTTPException(status_code=404, detail="No active strategy")
+    try:
+        strategy = get_strategy(request.symbol)
+        strategy_name = get_strategy_name(request.symbol)
+        
+        # Switch trading symbol in connector
+        await deriv_client.switch_symbol(request.symbol)
+        
+        return {
+            "success": True,
+            "symbol": request.symbol,
+            "strategy_name": strategy_name,
+            "strategy_id": strategy.name,
+            "config": strategy.config
+        }
+    except ValueError as e:
+        logger.error(f"Strategy selection error: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error selecting strategy: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    tick_data: Dict[str, Any] = payload.get("tick", {})
-    regime_data: Dict[str, Any] = payload.get("regime", {})
-    structure_data: Dict[str, Any] = payload.get("structure", {})
-    indicator_data: Dict[str, Any] = payload.get("indicators", {})
 
-    signal: Optional[Dict[str, Any]] = strategy_manager.run_strategy(
-        tick_data, regime_data, structure_data, indicator_data
-    )
-    return {"signal": signal}
+@router.post("/analyze")
+async def analyze_with_strategy(request: StrategyAnalysisRequest):
+    """
+    Run strategy analysis for a given symbol and market data.
+    
+    Args:
+        request: Contains symbol and market data
+        
+    Returns:
+        Strategy analysis result with signal, confidence, details
+    """
+    try:
+        # Get strategy for symbol
+        strategy = get_strategy(request.symbol)
+        
+        # Prepare data with defaults
+        regime_data = request.regime_data or {}
+        structure_data = request.structure_data or {"trend": "neutral", "score": 50}
+        indicator_data = request.indicator_data or {}
+        
+        # Run analysis
+        result = strategy.analyze(
+            request.market_data,
+            regime_data,
+            structure_data,
+            indicator_data
+        )
+        
+        if result is None:
+            return {
+                "success": True,
+                "symbol": request.symbol,
+                "signal": None,
+                "reason": "No signal generated"
+            }
+        
+        return {
+            "success": True,
+            "symbol": request.symbol,
+            **result
+        }
+        
+    except ValueError as e:
+        logger.error(f"Invalid symbol: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Strategy analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/symbols")
+async def get_available_symbols():
+    """
+    Get all available trading symbols.
+    
+    Returns:
+        List of supported symbols
+    """
+    return {
+        "success": True,
+        "symbols": list(set(STRATEGY_MAP.keys())),
+        "primary_symbols": ["VOLATILITY_10", "BOOM300N", "CRASH300N"]
+    }
+
+
+@router.get("/info/{symbol}")
+async def get_strategy_info(symbol: str):
+    """
+    Get detailed information about a strategy for a specific symbol.
+    
+    Args:
+        symbol: Trading symbol
+        
+    Returns:
+        Detailed strategy configuration and parameters
+    """
+    try:
+        strategy = get_strategy(symbol)
+        strategy_name = get_strategy_name(symbol)
+        
+        return {
+            "success": True,
+            "symbol": symbol,
+            "name": strategy_name,
+            "strategy_id": strategy.name,
+            "config": strategy.config,
+            "description": f"{strategy_name} - Optimized for {symbol}"
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting strategy info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

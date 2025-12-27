@@ -18,7 +18,9 @@ class TradeManager:
         requested_stake = signal.get('lots', 0.35) # Default to Deriv min if missing
         
         # Map Action to Contract Type (CALL=Buy, PUT=Sell)
-        contract_type = "CALL" if action == 1 else "PUT"
+        # If contract_type is provided in signal (e.g. MULTUP), use it.
+        # Otherwise default to standard CALL/PUT
+        contract_type = signal.get('contract_type', "CALL" if action == 1 else "PUT")
         
         matched_contract = None
         for c in contracts:
@@ -35,7 +37,14 @@ class TradeManager:
             return None
 
         # Extract limits from fresh contract data
-        min_stake = float(matched_contract.get('min_contract_measure', 0.35))
+        # 'min_contract_measure' is standard, but check 'min_stake' for multipliers just in case
+        min_stake = float(matched_contract.get('min_contract_measure', matched_contract.get('min_stake', 0.35)))
+        
+        # Guard: Multipliers on Synthetics often require strictly 1.00 or higher, despite contract metadata
+        if "MULT" in contract_type and min_stake < 1.0:
+            logger.info(f"Enforcing hard minimum stake of 1.0 for Multiplier {contract_type}")
+            min_stake = 1.0
+            
         max_stake = float(matched_contract.get('max_contract_measure', 5000.0))
         
         # Apply FIFO Clamping
@@ -57,8 +66,9 @@ class TradeManager:
             "currency": "USD",
             "amount": final_stake,
             "basis": "stake",
-            "duration": 5, # Could be made dynamic later
-            "duration_unit": "t",
+            "duration": signal.get('duration', 5), 
+            "duration_unit": signal.get('duration_unit', 't'),
+            "multiplier": signal.get('multiplier'), # Pass multiplier through
             "validation_metadata": {
                 "original_stake": requested_stake,
                 "adjusted_stake": final_stake,
@@ -86,10 +96,17 @@ class TradeManager:
             "basis": params['basis'],
             "contract_type": params['contract_type'],
             "currency": params['currency'],
-            "duration": params['duration'],
-            "duration_unit": params['duration_unit'],
             "symbol": params['symbol']
         }
+        
+        # Conditionals for contract types
+        if params['contract_type'] in ['MULTUP', 'MULTDOWN']:
+             # Multipliers need 'multiplier' param, NOT duration
+             payload['multiplier'] = params.get('multiplier', 20)
+        else:
+             # Standard Options need duration
+             payload['duration'] = params['duration']
+             payload['duration_unit'] = params['duration_unit']
         
         # IMPORTANT: CALL/PUT contracts don't support limit_order in Deriv API
         # SL/TP will be enforced locally by monitoring positions

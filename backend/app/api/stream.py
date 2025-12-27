@@ -17,6 +17,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @router.get("/feed/")
 async def sse_feed(request: Request):
+    print("SSE Client Connecting to /feed/")
     async def event_generator():
         queue = await stream_manager.subscribe_sse()
         try:

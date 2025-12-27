@@ -1,60 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Activity, TrendingUp, TrendingDown, Minus, Cpu, Zap } from 'lucide-react';
-
-interface MarketStatus {
-    regime: string;
-    volatility: string;
-    active_strategy: string;
-    symbol: string;
-}
+import { useTradingContext } from '@/context/TradingContext';
 
 export function MarketStatusCard() {
-    const [status, setStatus] = useState<MarketStatus>({
-        regime: 'Analyzing...',
-        volatility: 'Unknown',
-        active_strategy: 'Loading...',
-        symbol: '---'
-    });
-
-
-    useEffect(() => {
-        // Determine WS URL - use port 8001 to match backend
-        const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:8001/stream/ws";
-        console.log('[MarketIntelligence] Connecting to WebSocket:', wsUrl);
-
-        const ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-            console.log('[MarketIntelligence] WebSocket connected successfully');
-        };
-
-        ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                if (message.type === 'market_status' && message.data) {
-                    console.log('[MarketIntelligence] Received market status:', message.data);
-                    setStatus(message.data);
-                }
-            } catch (e) {
-                console.error("[MarketIntelligence] Failed to parse message:", e);
-            }
-        };
-
-        ws.onerror = (error) => {
-            console.error('[MarketIntelligence] WebSocket error:', error);
-        };
-
-        ws.onclose = (event) => {
-            console.log('[MarketIntelligence] WebSocket closed:', event.code, event.reason);
-        };
-
-        return () => {
-            console.log('[MarketIntelligence] Cleaning up WebSocket connection');
-            ws.close();
-        };
-    }, []);
+    const { marketStatus: status } = useTradingContext();
 
     const getRegimeIcon = (regime: string) => {
         if (!regime) return <Activity className="h-4 w-4 text-gray-500" />;
