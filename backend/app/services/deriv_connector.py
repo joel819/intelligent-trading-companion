@@ -457,6 +457,11 @@ class DerivConnector:
             logger.info(f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Vol: {self.regime_detector.current_regime.get('volatility')} | Regime: {self.regime_detector.current_regime.get('regime')}")
         
         skip_reason = None
+        current_regime = 'unknown'
+        current_volatility = 'unknown'
+        atr_val = 0.0
+        final_confidence = 0.0
+        
         try:
             # --- PHASE 1: MARKET INTELLIGENCE ---
             # 1. Update Market Data Once
@@ -493,16 +498,16 @@ class DerivConnector:
             )
             
             # Detailed Signal Logic (For Visibility)
-            final_confidence = 0.0
             is_safe = False
             action = None
             
             if strategy_signal:
-                action = strategy_signal['action']
+                strategy_action = strategy_signal['action']  # Strategy determines direction
+                strategy_confidence = strategy_signal.get('confidence', 0.5)
                 s_score = structure_data.get('score', 50)
                 i_score = indicator_data.get('score', 50)
                 
-                # Validate entry with structure and indicators
+                # Validate entry with structure and indicators (validator checks quality, not direction)
                 entry_signal = self.entry_validator.validate(
                     structure_data, indicator_data, is_vol_valid
                 )
@@ -511,39 +516,63 @@ class DerivConnector:
                     skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
                     action = None
                 else:
-                    final_confidence = entry_signal['confidence']
-                    action = entry_signal['action']
+                    validator_action = entry_signal['action']
+                    validator_confidence = entry_signal['confidence']
                     
-                    # Reasonable confidence thresholds for production
-                    if current_volatility == "extreme":
-                        threshold = 0.4  # Moderate threshold for extreme volatility
-                    elif current_volatility == "high":
-                        threshold = 0.3  # Lower threshold for high volatility
+                    # Use strategy's confidence (it knows the market better), but validate direction alignment
+                    # For direction-specific strategies (Boom300=SELL, Crash300=BUY), strategy takes precedence
+                    # For general strategies (V10), require alignment
+                    
+                    # Check if directions align (unless strategy is direction-specific)
+                    strategy_config = self.strategy_manager.current_strategy.config if self.strategy_manager.current_strategy else {}
+                    is_direction_specific = strategy_config.get('direction') in ['SELL_ONLY', 'BUY_ONLY']
+                    
+                    if is_direction_specific:
+                        # For direction-specific strategies, use strategy action and confidence
+                        action = strategy_action
+                        final_confidence = strategy_confidence
                     else:
-                        threshold = 0.2  # Even lower for normal conditions
-                        
-                    if final_confidence < threshold:
-                        skip_reason = f"Low Confidence: {final_confidence:.2f} < {threshold} (Scores: S={s_score}, I={i_score})"
-                    elif strategy_signal['action'] != entry_signal['action']:
-                        skip_reason = f"Signal Conflict: Strategy={strategy_signal['action']} vs Validator={entry_signal['action']}"
-                    else:
-                        # --- PHASE 3: RISK MANAGEMENT ---
-                        # 6. Check Risk Guards (Daily Loss, etc.)
-                        start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
-                        is_safe, guard_msg = self.risk_guard.check_trade_allowed(
-                            self.current_account.get('balance', 0.0),
-                            start_bal,
-                            len(self.open_positions),
-                            current_volatility,
-                            self.is_authorized
-                        )
-                        
-                        if not is_safe:
-                            skip_reason = f"Risk Guard Blocked: {guard_msg}"
+                        # For general strategies, require alignment but use strategy confidence
+                        if strategy_action != validator_action:
+                            skip_reason = f"Signal Conflict: Strategy={strategy_action} vs Validator={validator_action}"
+                            action = None
                         else:
-                            # 7. Check Cooldown
-                            if not self.cooldown_manager.can_trade():
-                                skip_reason = "Cooldown Manager: Interval Active"
+                            action = strategy_action
+                            # Combine confidences (strategy confidence weighted more)
+                            final_confidence = (strategy_confidence * 0.6 + validator_confidence * 0.4)
+                    
+                    if action:
+                        # Reasonable confidence thresholds for production
+                        if current_volatility == "extreme":
+                            threshold = 0.4  # Moderate threshold for extreme volatility
+                        elif current_volatility == "high":
+                            threshold = 0.3  # Lower threshold for high volatility
+                        else:
+                            threshold = 0.2  # Even lower for normal conditions
+                            
+                        if final_confidence < threshold:
+                            skip_reason = f"Low Confidence: {final_confidence:.2f} < {threshold} (Scores: S={s_score}, I={i_score})"
+                            action = None
+                        else:
+                            # --- PHASE 3: RISK MANAGEMENT ---
+                            # 6. Check Risk Guards (Daily Loss, etc.)
+                            start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
+                            is_safe, guard_msg = self.risk_guard.check_trade_allowed(
+                                self.current_account.get('balance', 0.0),
+                                start_bal,
+                                len(self.open_positions),
+                                current_volatility,
+                                self.is_authorized
+                            )
+                            
+                            if not is_safe:
+                                skip_reason = f"Risk Guard Blocked: {guard_msg}"
+                                action = None
+                            else:
+                                # 7. Check Cooldown
+                                if not self.cooldown_manager.can_trade():
+                                    skip_reason = "Cooldown Manager: Interval Active"
+                                    action = None
             else:
                 if not skip_reason: skip_reason = "No Strategy Signal (RSI/Momentum not met)"
 
