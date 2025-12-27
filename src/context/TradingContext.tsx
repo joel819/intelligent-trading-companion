@@ -108,6 +108,37 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         enabled: isConnected && botStatus.isAuthorized
     });
 
+    // Fetch initial logs on mount and when connected
+    useQuery({
+        queryKey: ['logs'],
+        queryFn: async () => {
+            try {
+                const data = await api.logs.get();
+                if (Array.isArray(data)) {
+                    // Merge with existing logs (WebSocket may have added some)
+                    setLogs(prev => {
+                        const existingIds = new Set(prev.map(l => l.id));
+                        const newLogs = data
+                            .filter(log => !existingIds.has(log.id || log.timestamp || ''))
+                            .map(log => ({
+                                id: log.id || log.timestamp || Date.now().toString(),
+                                timestamp: log.timestamp || new Date().toISOString(),
+                                level: log.level || 'info',
+                                message: log.message || '',
+                                source: log.source || 'System'
+                            }));
+                        return [...newLogs, ...prev].slice(0, 100);
+                    });
+                }
+                return data;
+            } catch (error) {
+                console.error('Failed to fetch logs:', error);
+                return [];
+            }
+        },
+        enabled: isConnected
+    });
+
     // 4. Fetch Accounts
     const { data: accountsRaw = [] } = useQuery({
         queryKey: ['accounts'],

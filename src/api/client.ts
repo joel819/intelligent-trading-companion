@@ -106,5 +106,12 @@ export const api = {
             if (!res.ok) throw new Error('Failed to fetch positions');
             return res.json();
         }
+    },
+    logs: {
+        get: async () => {
+            const res = await fetch(`${API_BASE}/logs/`);
+            if (!res.ok) throw new Error('Failed to fetch logs');
+            return res.json();
+        }
     }
 };

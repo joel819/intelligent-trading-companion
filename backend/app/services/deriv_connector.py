@@ -444,16 +444,17 @@ class DerivConnector:
             "timestamp": datetime.fromtimestamp(epoch).isoformat(),
         }
         
-        self.tick_count += 1
+        # Broadcast ALL ticks for live feed (before symbol filtering)
+        await stream_manager.broadcast_tick(tick_data)
         
+        # Only process ticks for target symbol
         if symbol != self.target_symbol:
             return
 
+        self.tick_count += 1
+
         if self.tick_count % 10 == 0:
             logger.info(f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Vol: {self.regime_detector.current_regime.get('volatility')} | Regime: {self.regime_detector.current_regime.get('regime')}")
-
-        # Broadcast raw tick for chart
-        await stream_manager.broadcast_tick(tick_data)
         
         skip_reason = None
         try:

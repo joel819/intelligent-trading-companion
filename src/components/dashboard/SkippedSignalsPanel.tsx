@@ -27,16 +27,20 @@ const reasonConfig = {
 
 export const SkippedSignalsPanel = ({ signals }: SkippedSignalsProps) => {
   const getReasonConfig = (reason: string) => {
-    // Debug incoming signals
-    console.log('[SkippedSignals] Rendering panel with signals:', signals);
+    if (!reason) return reasonConfig.default;
 
     for (const key in reasonConfig) {
-      if (reason && reason.toLowerCase().includes(key.toLowerCase())) {
+      if (key !== 'default' && reason && reason.toLowerCase().includes(key.toLowerCase())) {
         return reasonConfig[key as keyof typeof reasonConfig];
       }
     }
     return reasonConfig.default;
   };
+  
+  // Debug incoming signals
+  if (signals.length > 0) {
+    console.log('[SkippedSignals] Rendering panel with signals:', signals.length);
+  }
 
   return (
     <div className="glass-card p-5 animate-fade-in">
