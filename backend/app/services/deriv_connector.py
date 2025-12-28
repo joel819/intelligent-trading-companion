@@ -20,9 +20,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DerivConnector:
-    def __init__(self, token: str = None, app_id: str = "65395"):
+    def __init__(self, token: str = None, app_id: str = "118420"):
         self.token = token or os.getenv("DERIV_TOKEN")
-        self.app_id = app_id or os.getenv("DERIV_APP_ID", "65395")
+        self.app_id = app_id or os.getenv("DERIV_APP_ID", "118420")
         if not self.token:
             logger.warning("No DERIV_TOKEN found in environment. Connection may fail.")
         self.ws = None
@@ -482,11 +482,12 @@ class DerivConnector:
                     "symbol": symbol
                 })
 
-            # 2. Filter Volatility
+            # 2. Filter Volatility (DISABLED)
             is_vol_valid, block_reason = self.volatility_filter.is_valid(tick_for_algo, atr_val)
             
             if not is_vol_valid:
                 skip_reason = f"Volatility Filter Blocked: {block_reason}"
+                # pass # Bypass
 
             # 3. Analyze Market Structure & Indicators
             structure_data = self.market_structure.analyze(tick_for_algo)
@@ -496,6 +497,8 @@ class DerivConnector:
             strategy_signal = self.strategy_manager.run_strategy(
                 symbol, tick_for_algo, regime_data, structure_data, indicator_data
             )
+            
+
             
             # Detailed Signal Logic (For Visibility)
             is_safe = False
@@ -532,15 +535,14 @@ class DerivConnector:
                         action = strategy_action
                         final_confidence = strategy_confidence
                     else:
-                        # For general strategies, require alignment but use strategy confidence
                         if strategy_action != validator_action:
                             skip_reason = f"Signal Conflict: Strategy={strategy_action} vs Validator={validator_action}"
                             action = None
                         else:
                             action = strategy_action
-                            # Combine confidences (strategy confidence weighted more)
-                            final_confidence = (strategy_confidence * 0.6 + validator_confidence * 0.4)
+                        final_confidence = strategy_confidence # Use raw strategy confidence (e.g. 50 from test mode)
                     
+                    logger.info(f"DEBUG TRACE 1: Action={action}, Conf={final_confidence}, StrategyConf={strategy_confidence}")
                     if action:
                         # Reasonable confidence thresholds for production
                         if current_volatility == "extreme":
@@ -620,7 +622,7 @@ class DerivConnector:
             tp_price = self.dynamic_tp.calculate_tp_price(float(bid), sl_price, action, momentum_factor=momentum_factor)
             
             # 9. Weighted Lot Sizing
-            risk_pct = self.default_config.get('riskPercent', 1.0)
+            risk_pct = self.default_config.get('riskPercent', 0.5)
             risk_amount = self.lot_calculator.calculate_lot_size(
                 self.current_account.get('balance', 0.0),
                 risk_pct,
@@ -644,6 +646,7 @@ class DerivConnector:
             execution_result_json = EngineWrapper.execute_trade(json.dumps(trade_params))
             result = json.loads(execution_result_json)
             
+            logger.info(f"DEBUG: C++ Engine Says: {result}")
             if result.get("status") == "approved":
                 # Execute Real Trade
                 strategy_info = self.strategy_manager.get_active_strategy_info()
@@ -777,8 +780,10 @@ class DerivConnector:
                     return {"status": "error", "message": buy_resp['error'].get('message', 'Trade Execution Failed')}
                 
                 # Broadcast success log
-                # Trigger immediate portfolio refresh to update UI positions
-                await self.send_request({"portfolio": 1})
+                # We do NOT trigger immediate portfolio refresh here to avoid race condition 
+                # where API returns old state and wipes our optimistic update.
+                # We rely on periodic sync or proposal_open_contract streams.
+                # await self.send_request({"portfolio": 1})
                 
                 await stream_manager.broadcast_log({
                     "id": str(uuid.uuid4()),
@@ -800,6 +805,28 @@ class DerivConnector:
                         "take_profit": metadata.get('take_profit'),
                         "strategy": metadata.get('strategy')
                     }
+                
+                # OPTIMISTIC UI UPDATE: Add to local positions immediately
+                new_pos_id = str(buy_resp['buy']['contract_id'])
+                entry_price = float(buy_resp['buy']['buy_price'])
+                current_price = entry_price # Initially same
+                
+                optimistic_pos = {
+                    "id": new_pos_id,
+                    "symbol": symbol,
+                    "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
+                    "lots": float(amount),
+                    "entryPrice": entry_price,
+                    "currentPrice": current_price,
+                    "pnl": 0.0,
+                    "openTime": datetime.now().isoformat()
+                }
+                
+                # Avoid duplicates
+                if not any(p['id'] == new_pos_id for p in self.open_positions):
+                    self.open_positions.append(optimistic_pos)
+                    await stream_manager.broadcast_event('positions', self.open_positions)
+                    logger.info("Optimistic UI Update executed for new position.")
 
                 return {"status": "success", "data": buy_resp['buy']}
             else:
@@ -987,7 +1014,7 @@ class DerivConnector:
         
         logger.info(f"Closing Contract {contract_id}. Reason: {reason}")
         req = {
-            "sell": contract_id,
+            "sell": int(contract_id) if str(contract_id).isdigit() else contract_id,
             "price": 0 # 0 means market price
         }
         

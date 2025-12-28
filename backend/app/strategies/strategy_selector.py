@@ -7,8 +7,8 @@ Provides clean, scalable multi-pair strategy selection.
 from typing import Type, Dict
 from .base_strategy import BaseStrategy
 from .strategy_v10_super_safe import V10SuperSafeStrategy
-from .strategy_boom300_super_safe import Boom300SuperSafeStrategy
-from .strategy_crash300_super_safe import Crash300SuperSafeStrategy
+from .boom300_safe_strategy import Boom300SafeStrategy
+from .crash300_safe_strategy import Crash300SafeStrategy
 
 # Symbol to Strategy Class Mapping
 STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
@@ -18,12 +18,14 @@ STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
     "R_10": V10SuperSafeStrategy,     # Common trading symbol
     "R10": V10SuperSafeStrategy,      # No underscore
     
-    "BOOM300": Boom300SuperSafeStrategy,
-    "BOOM300N": Boom300SuperSafeStrategy, # Official symbol
+    "BOOM300": Boom300SafeStrategy,
+    "BOOM300N": Boom300SafeStrategy, # Official symbol
+    "boom_300_safe": Boom300SafeStrategy, # Explicit key
     
-    "CRASH_300": Crash300SuperSafeStrategy,
-    "CRASH300": Crash300SuperSafeStrategy,  # No underscore format
-    "CRASH300N": Crash300SuperSafeStrategy, # Official symbol
+    "CRASH_300": Crash300SafeStrategy,
+    "CRASH300": Crash300SafeStrategy,
+    "CRASH300N": Crash300SafeStrategy,
+    "crash_300_safe": Crash300SafeStrategy, # Explicit key
 
     # Additional Volatility Indices
     "R_10": V10SuperSafeStrategy,
@@ -33,26 +35,26 @@ STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
     "R_100": V10SuperSafeStrategy, "R100": V10SuperSafeStrategy,
     
     # Boom/Crash 500
-    "BOOM_500": Boom300SuperSafeStrategy, "BOOM500": Boom300SuperSafeStrategy,
-    "CRASH_500": Crash300SuperSafeStrategy, "CRASH500": Crash300SuperSafeStrategy,
+    "BOOM_500": Boom300SafeStrategy, "BOOM500": Boom300SafeStrategy,
+    "CRASH_500": Crash300SafeStrategy, "CRASH500": Crash300SafeStrategy,
 }
 
 # Friendly names for UI display
 STRATEGY_DISPLAY_NAMES: Dict[str, str] = {
     "VOLATILITY_10": "V10 Super Safe",
-    "BOOM300": "Boom 300 Super Safe",
-    "BOOM300N": "Boom 300 Super Safe",
-    "CRASH_300": "Crash 300 Super Safe",
-    "CRASH300N": "Crash 300 Super Safe",
+    "BOOM300": "Boom 300 Safe",
+    "BOOM300N": "Boom 300 Safe",
+    "CRASH_300": "Crash 300 Safe",
+    "CRASH300N": "Crash 300 Safe",
     "R_10": "Volatility 10 Safe",
     "R_25": "Volatility 25 Safe",
     "R_50": "Volatility 50 Safe",
     "R_75": "Volatility 75 Safe",
     "R_100": "Volatility 100 Safe",
-    "BOOM_500": "Boom 500 Super Safe",
-    "BOOM500": "Boom 500 Super Safe",
-    "CRASH_500": "Crash 500 Super Safe",
-    "CRASH500": "Crash 500 Super Safe",
+    "BOOM_500": "Boom 500 Safe",
+    "BOOM500": "Boom 500 Safe",
+    "CRASH_500": "Crash 500 Safe",
+    "CRASH500": "Crash 500 Safe",
 }
 
 
@@ -164,29 +166,29 @@ def list_strategies_for_ui() -> list:
         },
         {
             "symbol": "BOOM300N",
-            "name": "Boom 300 Super Safe",
-            "description": "SELL-only spike-catching for Boom 300",
+            "name": "Boom 300 Safe",
+            "description": "SELL-only Safe Mode for Boom 300",
             "direction": "SELL ONLY",
             "type": "pullback"
         },
         {
             "symbol": "CRASH300N",
-            "name": "Crash 300 Super Safe",
-            "description": "BUY-only spike-catching for Crash 300",
+            "name": "Crash 300 Safe",
+            "description": "BUY-only Safe Mode for Crash 300",
             "direction": "BUY ONLY",
             "type": "pullback"
         },
         {
             "symbol": "BOOM500",
-            "name": "Boom 500 Super Safe",
-            "description": "SELL-only spike-catching for Boom 500",
+            "name": "Boom 500 Safe",
+            "description": "SELL-only Safe Mode for Boom 500",
             "direction": "SELL ONLY",
             "type": "pullback"
         },
          {
             "symbol": "CRASH500",
-            "name": "Crash 500 Super Safe",
-            "description": "BUY-only spike-catching for Crash 500",
+            "name": "Crash 500 Safe",
+            "description": "BUY-only Safe Mode for Crash 500",
             "direction": "BUY ONLY",
             "type": "pullback"
         }
