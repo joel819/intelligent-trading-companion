@@ -68,6 +68,8 @@ class DerivConnector:
             min_candle_body_pips=0.0,  # Allow zero candle body for synthetic indices
             atr_spike_multiplier=10.0   # Much higher spike tolerance
         )
+        # Apply V10 parameters immediately (since we default to R_10)
+        self.volatility_filter.set_v10_mode()
         
         # Signals
         self.market_structure = MarketStructure()
@@ -516,7 +518,8 @@ class DerivConnector:
                 )
                 
                 if not entry_signal:
-                    skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
+                    if not skip_reason: # Verify we haven't already skipped due to volatility
+                        skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
                     action = None
                 else:
                     validator_action = entry_signal['action']

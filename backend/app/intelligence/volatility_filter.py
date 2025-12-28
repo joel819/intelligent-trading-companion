@@ -80,12 +80,12 @@ class VolatilityFilter:
         Configure volatility filter for V10 Super Safe mode.
         Applies V10-specific thresholds for smoother market conditions.
         """
-        self.min_atr_threshold = 0.00025  # 0.25 volatility
-        self.max_atr_threshold = 0.0012   # 1.20 volatility
-        self.noise_threshold = 0.18
-        self.min_candle_body_pct = 0.55   # 55% body requirement
-        self.max_wick_pct = 0.65          # 65% max wick
-        logger.info("VolatilityFilter configured for V10 Super Safe mode")
+        self.min_atr_threshold = 0.00015  # 0.15 volatility (Looser)
+        self.max_atr_threshold = 0.0015   # 1.50 volatility (Looser)
+        self.noise_threshold = 0.70       # 0.70 noise (Aggressive Tuning for Current Market)
+        self.min_candle_body_pct = 0.40   # 40% body (Looser)
+        self.max_wick_pct = 0.75          # 75% max wick (Looser)
+        logger.info("VolatilityFilter configured for V10 Super Safe mode (User Tuned: Noise=0.70)")
     
     def set_boom300_mode(self) -> None:
         """

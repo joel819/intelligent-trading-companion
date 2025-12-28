@@ -30,18 +30,18 @@ class V10SuperSafeStrategy(BaseStrategy):
             "max_pause_minutes": 12,
             
             # Volatility Filters (V10-specific)
-            "min_volatility": 0.25,
-            "max_volatility": 1.20,
-            "noise_threshold": 0.18,
-            "min_candle_body_pct": 0.55,  # 55% of full candle
-            "max_wick_pct": 0.65,  # 65% max wick size
+            "min_volatility": 0.15,
+            "max_volatility": 1.50,
+            "noise_threshold": 0.25,
+            "min_candle_body_pct": 0.40,  # 40% of full candle
+            "max_wick_pct": 0.75,  # 75% max wick size
             
             # Trend Filter
             "use_ma_trend": True,
-            "ma_fast": 20,
-            "ma_slow": 50,
-            "min_ma_slope": 0.03,  # Absolute slope
-            "adx_threshold": 15,
+            "ma_fast": 14,
+            "ma_slow": 40,
+            "min_ma_slope": 0.01,  # Catch early trends
+            "adx_threshold": 10,
             "sideways_slope_threshold": 0.005,
             
             # Entry Logic
