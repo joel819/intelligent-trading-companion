@@ -2,12 +2,21 @@ import asyncio
 import json
 import websockets
 import logging
+import numpy as np
 import uuid
 from typing import Callable, Optional, Dict, Any, List
 from datetime import datetime
 from app.core.engine_wrapper import EngineWrapper
 from app.services.trade_manager import TradeManager
 from app.services.stream_manager import stream_manager
+from app.signals.market_structure import MarketStructure
+from app.signals.indicator_layer import IndicatorLayer
+from app.signals.entry_validator import EntryValidator
+from app.exits.smart_stops import SmartStopLoss
+from app.exits.dynamic_tp import DynamicTakeProfit
+from app.risk.weighted_lots import WeightedLotCalculator
+from app.risk.risk_guard import RiskGuard
+from app.risk.cooldown_manager import CooldownManager
 
 # Deriv API Endpoint
 DERIV_WS_BASE_URL = "wss://ws.derivws.com/websockets/v3"
@@ -53,28 +62,20 @@ class DerivConnector:
         }
 
         # --- ZONE UPGRADES INITIALIZATION ---
-        from app.intelligence import RegimeDetector, VolatilityFilter
-        from app.signals import MarketStructure, IndicatorLayer, EntryValidator
-        from app.exits import SmartStopLoss, DynamicTakeProfit
-        from app.risk import WeightedLotCalculator, RiskGuard, CooldownManager
-        from app.strategies import strategy_manager
+        from app.strategies.strategy_manager import strategy_manager
+        from app.strategies.master_engine import MasterEngine
         
         # Intelligence
-        self.regime_detector = RegimeDetector()
-        # More permissive volatility settings for increased trade frequency
-        self.volatility_filter = VolatilityFilter(
-            min_atr_threshold=0.0,     # Allow zero ATR for startup period
-            max_atr_threshold=0.02,     # Higher maximum ATR
-            min_candle_body_pips=0.0,  # Allow zero candle body for synthetic indices
-            atr_spike_multiplier=10.0   # Much higher spike tolerance
-        )
-        # Apply V10 parameters immediately (since we default to R_10)
-        self.volatility_filter.set_v10_mode()
+        # Intelligence - Unified Master Engine
+        self.engine = MasterEngine()
         
         # Signals
         self.market_structure = MarketStructure()
         self.indicator_layer = IndicatorLayer()
         self.entry_validator = EntryValidator()
+        
+        # Link indicator_layer to engine for RSI Hybrid Mode access
+        self.engine.indicator_layer = self.indicator_layer
         
         # Exits
         self.smart_sl = SmartStopLoss()
@@ -90,7 +91,11 @@ class DerivConnector:
         self.strategy_manager = strategy_manager
         
         # Local Contract Memory (SL/TP Tracking)
+        # Local Contract Memory (SL/TP Tracking)
         self.contract_metadata: Dict[str, Dict] = {}
+        
+        # Multi-Timeframe Storage (1H Candles)
+        self.candles_1h: Dict[str, deque] = {}
         
         # Initialize C++ Engine with new JSON config
         try:
@@ -128,14 +133,7 @@ class DerivConnector:
 
     def apply_config_updates(self, config: Dict[str, Any]):
         """Apply dynamic configuration updates to sub-services."""
-        # Update Volatility Filter
-        if hasattr(self.volatility_filter, 'update_params'):
-            self.volatility_filter.update_params(
-                min_atr = config.get("min_atr"),
-                max_atr = config.get("max_atr"),
-                min_pips = config.get("min_pips"),
-                spike_multiplier = config.get("atr_spike_multiplier")
-            )
+        pass
             
         # Update Risk Guard
         if hasattr(self.risk_guard, 'update_params'):
@@ -176,6 +174,11 @@ class DerivConnector:
                 
             except Exception as e:
                 logger.error(f"Connection failed: {e}. Retrying in 5 seconds...")
+                await stream_manager.broadcast_notification(
+                    "Connection Lost",
+                    f"Connection to Deriv failed. Retrying... Error: {e}",
+                    "error"
+                )
                 self.is_connected = False
                 await asyncio.sleep(5)
 
@@ -206,6 +209,7 @@ class DerivConnector:
             
             await asyncio.gather(
                 self.subscribe_ticks(),
+                self.subscribe_candles_1h(), # MTF Sub
                 self.subscribe_balance(),
                 self.subscribe_portfolio(),
                 self.subscribe_contracts(),
@@ -293,7 +297,14 @@ class DerivConnector:
                     
                 return
         
-        print(">>> ALL AUTH ATTEMPTS FAILED")
+        if not self.token:
+             msg = ">>> ALL AUTH ATTEMPTS FAILED. PLEASE RE-LOGIN."
+             print(msg)
+             await stream_manager.broadcast_notification(
+                 "Authorization Failed",
+                 "Bot could not authorize. Please re-login in Dashboard.",
+                 "critical"
+             )
 
 
     async def subscribe_ticks(self):
@@ -325,6 +336,24 @@ class DerivConnector:
         req = {"proposal_open_contract": 1, "subscribe": 1}
         await self.ws.send(json.dumps(req))
         logger.info("Subscribed to global Contract Updates")
+
+    async def subscribe_candles_1h(self):
+        """Subscribe to 1-Hour candles for active symbols for MTF analysis."""
+        for symbol in self.active_symbols:
+            # Initialize storage
+            if symbol not in self.candles_1h:
+                self.candles_1h[symbol] = deque(maxlen=20)
+                
+            logger.info(f"Subscribing to 1H candles: {symbol}")
+            req = {
+                "ticks_history": symbol,
+                "style": "candles",
+                "granularity": 3600, # 1 Hour
+                "end": "latest",
+                "count": 20,
+                "subscribe": 1
+            }
+            await self.send_request(req)
 
     async def get_active_symbols(self):
         """Fetches active symbols from Deriv if not already cached/set."""
@@ -412,6 +441,36 @@ class DerivConnector:
                 if 'tick' in data:
                     asyncio.create_task(self.handle_tick(data['tick']))
                 
+                if 'ohlc' in data:
+                    # Async update of 1h candles
+                    symbol = data['ohlc']['symbol']
+                    if symbol in self.candles_1h:
+                        c_data = data['ohlc']
+                        candle = {
+                            "open": float(c_data['open']),
+                            "high": float(c_data['high']),
+                            "low": float(c_data['low']),
+                            "close": float(c_data['close']),
+                            "epoch": int(c_data['open_time'])
+                        }
+                        # Deque update logic
+                        q = self.candles_1h[symbol]
+                        if not q: q.append(candle)
+                        elif q[-1]['epoch'] == candle['epoch']: q[-1] = candle
+                        else: q.append(candle)
+                        
+                        # Sync with Engine
+                        # If the symbol matches the target or we want engine to be multi-asset (current MasterEngine is single asset implicitly or needs dict)
+                        # Current MasterEngine seems single-instance single-state (candles_1m, etc.)
+                        # If we trade multiple symbols, we need one Engine per symbol OR Engine handles dicts.
+                        # The user prompt: "Class: MasterEngine... One stable central logic engine"
+                        # But `candles_1m` is just a deque, not `candles_1m[symbol]`.
+                        # This implies MasterEngine might be per-symbol or we need to clear it?
+                        # Or we update MasterEngine.candles_1h here?
+                        # MasterEngine.inject_external_candles("1h", list(q)) 
+                        if symbol == self.target_symbol:
+                             self.engine.inject_external_candles("1h", list(q))
+                
                 if 'balance' in data:
                      asyncio.create_task(self.handle_balance(data['balance']))
 
@@ -449,6 +508,9 @@ class DerivConnector:
         # Broadcast ALL ticks for live feed (before symbol filtering)
         await stream_manager.broadcast_tick(tick_data)
         
+        # Monitor positions for local SL/TP (for Options trading)
+        await self.monitor_positions_for_sl_tp(float(bid), symbol)
+        
         # Only process ticks for target symbol
         if symbol != self.target_symbol:
             return
@@ -456,7 +518,34 @@ class DerivConnector:
         self.tick_count += 1
 
         if self.tick_count % 10 == 0:
-            logger.info(f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Vol: {self.regime_detector.current_regime.get('volatility')} | Regime: {self.regime_detector.current_regime.get('regime')}")
+            market_mode = self.engine.detect_market_mode(list(self.engine.candles_1m))
+            msg = f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Mode: {market_mode}"
+            logger.info(msg)
+            # Make visible to API
+            await stream_manager.broadcast_log({
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now().isoformat(),
+                "message": msg,
+                "level": "info",
+                "source": "DerivConnector"
+            })
+            
+        # Throttled Strategy Trace (Every 60 ticks/approx 1 min)
+        if self.tick_count % 60 == 0:
+            indicator_data = self.indicator_layer.analyze({'quote': float(bid), 'epoch': epoch})
+            rsi = indicator_data.get('rsi', 0)
+            ma_trend = indicator_data.get('ma_trend', 'N/A')
+            market_mode = self.engine.detect_market_mode(list(self.engine.candles_1m))
+            msg = f"[STRATEGY TRACE] Analyzing {symbol} | RSI: {rsi:.1f} | Trend: {ma_trend} | Mode: {market_mode}"
+            logger.info(msg)
+            await stream_manager.broadcast_log({
+                "id": str(uuid.uuid4()),
+                "timestamp": datetime.now().isoformat(),
+                "message": msg,
+                "level": "info",
+                "source": "Strategy"
+            })
+
         
         skip_reason = None
         current_regime = 'unknown'
@@ -466,38 +555,58 @@ class DerivConnector:
         
         try:
             # --- PHASE 1: MARKET INTELLIGENCE ---
-            # 1. Update Market Data Once
+            # 1. Update Engine
+            self.engine.update_tick(symbol, float(bid), epoch)
+            
             tick_for_algo = {'quote': float(bid), 'epoch': epoch}
-            regime_data = self.regime_detector.update(tick_for_algo)
             
-            current_regime = regime_data.get('regime', 'unknown')
-            current_volatility = regime_data.get('volatility', 'unknown')
-            atr_val = regime_data.get('atr', 0.0)
+            # Get Unified Status
+            # We use 1m candles for primary mode detection as per typical scalping logic, 
+            # but MasterEngine uses all TFs internally for confidence.
+            candles_1m_list = list(self.engine.candles_1m)
+            market_mode = self.engine.detect_market_mode(candles_1m_list)
+            noise_detected = self.engine.detect_noise(candles_1m_list)
+            volatility_state = self.engine.get_volatility("1m")
             
+            current_regime = market_mode # Mapping for logging
+            current_volatility = volatility_state
+            
+            # ATR check for logging
+            atr_val = 0.0
+            if len(candles_1m_list) > 14:
+                 atr_val = self.engine._atr(
+                    np.array([c['high'] for c in candles_1m_list]),
+                    np.array([c['low'] for c in candles_1m_list]),
+                    np.array([c['close'] for c in candles_1m_list]), 14
+                )[-1]
+
             # --- BROADCAST MARKET STATUS (Throttled) ---
             if self.tick_count % 5 == 0:
                 strategy_info = self.strategy_manager.get_active_strategy_info()
                 await stream_manager.broadcast_event('market_status', {
-                    "regime": current_regime,
-                    "volatility": current_volatility,
+                    "regime": market_mode,
+                    "volatility": volatility_state,
                     "active_strategy": strategy_info.get("name", "None"),
                     "symbol": symbol
                 })
 
-            # 2. Filter Volatility (DISABLED)
-            is_vol_valid, block_reason = self.volatility_filter.is_valid(tick_for_algo, atr_val)
-            
-            if not is_vol_valid:
-                skip_reason = f"Volatility Filter Blocked: {block_reason}"
-                # pass # Bypass
+            # 2. Filter Noise
+            if noise_detected:
+                skip_reason = f"MasterEngine: Noise/Spike Detected"
+                # block?
+                # We will continue but confidence will be impacted or strategy can decide
 
             # 3. Analyze Market Structure & Indicators
             structure_data = self.market_structure.analyze(tick_for_algo)
             indicator_data = self.indicator_layer.analyze(tick_for_algo)
             
             # 4. Run Active Strategy
+            # Strategy now receives the ENGINE instance
             strategy_signal = self.strategy_manager.run_strategy(
-                symbol, tick_for_algo, regime_data, structure_data, indicator_data
+                symbol, tick_for_algo, 
+                engine=self.engine, # PASSING ENGINE
+                structure_data=structure_data, 
+                indicator_data=indicator_data
             )
             
 
@@ -599,6 +708,15 @@ class DerivConnector:
                     "timestamp": datetime.now().isoformat()
                 })
                 
+                # Also log to history for debugging -> REMOVED per user request to reduce noise
+                # await stream_manager.broadcast_log({
+                #     "id": str(uuid.uuid4()),
+                #     "timestamp": datetime.now().isoformat(),
+                #     "message": f"Skipped: {skip_reason} ({symbol})",
+                #     "level": "warning",
+                #     "source": "Strategy"
+                # })
+                
                 # Throttle return to avoid blocking, but log everything
                 if self.tick_count % 5 == 0:
                     return
@@ -615,14 +733,24 @@ class DerivConnector:
                  return
 
             # 8. Smart Exits
-            momentum_factor = 1.0
-            if action == "BUY":
-                momentum_factor = max(0.5, indicator_data.get('score', 50) / 50.0)
-            else: # SELL
-                momentum_factor = max(0.5, (100 - indicator_data.get('score', 50)) / 50.0)
+            # Use SL/TP from strategy if available, otherwise fallback to MasterEngine logic
+            sl_price = strategy_signal.get('sl') if strategy_signal else None
+            tp_price = strategy_signal.get('tp') if strategy_signal else None
             
-            sl_price = self.smart_sl.calculate_sl_price(float(bid), action, atr_val)
-            tp_price = self.dynamic_tp.calculate_tp_price(float(bid), sl_price, action, momentum_factor=momentum_factor)
+            if sl_price is None or tp_price is None:
+                # Fallback to generic calculation if strategy didn't provide it
+                momentum_factor = 1.0
+                if action == "BUY":
+                    momentum_factor = max(0.5, indicator_data.get('score', 50) / 50.0)
+                else: # SELL
+                    momentum_factor = max(0.5, (100 - indicator_data.get('score', 50)) / 50.0)
+                
+                if sl_price is None:
+                    sl_price = self.smart_sl.calculate_sl_price(float(bid), action, atr_val)
+                if tp_price is None:
+                    tp_price = self.dynamic_tp.calculate_tp_price(float(bid), sl_price, action, momentum_factor=momentum_factor)
+            
+            logger.info(f"[EXECUTION PREP] Action: {action}, SL: {sl_price}, TP: {tp_price}, Confidence: {final_confidence}")
             
             # 9. Weighted Lot Sizing
             risk_pct = self.default_config.get('riskPercent', 0.5)
@@ -765,11 +893,17 @@ class DerivConnector:
             
             if 'proposal' in proposal_resp:
                 from app.services.audit_logger import audit_logger
-                proposal_id = proposal_resp['proposal']['id']
+                proposal_data = proposal_resp['proposal']
+                proposal_id = proposal_data['id']
+                
+                logger.info(f"Proposal Successful: ID={proposal_id}, Spot={proposal_data.get('spot')}, Payout={proposal_data.get('payout')}")
                 
                 # 4. Execution (Buy)
                 buy_req = {"buy": proposal_id, "price": 10000} 
+                logger.info(f"Sending FINAL Buy Request: {buy_req}")
                 buy_resp = await self.send_request(buy_req)
+                
+                logger.info(f"RAW BUY RESPONSE from Deriv: {buy_resp}")
                 
                 # Log to Audit
                 audit_logger.log_trade(
@@ -777,16 +911,27 @@ class DerivConnector:
                     validation=validated_params['validation_metadata'],
                     response=buy_resp
                 )
-                logger.info(f"Trade Execution Result: {buy_resp}")
                 
                 if 'error' in buy_resp:
-                    return {"status": "error", "message": buy_resp['error'].get('message', 'Trade Execution Failed')}
+                    err_msg = buy_resp['error'].get('message', 'Trade Execution Failed')
+                    await stream_manager.broadcast_notification(
+                        "Trade Failed",
+                        f"Failed to place trade on {symbol}: {err_msg}",
+                        "error"
+                    )
+                    return {"status": "error", "message": err_msg}
                 
                 # Broadcast success log
                 # We do NOT trigger immediate portfolio refresh here to avoid race condition 
                 # where API returns old state and wipes our optimistic update.
                 # We rely on periodic sync or proposal_open_contract streams.
                 # await self.send_request({"portfolio": 1})
+                
+                await stream_manager.broadcast_notification(
+                    "Trade Executed",
+                    f"Placed {contract_type} on {symbol} (Stake: {validated_params['amount']})",
+                    "success"
+                )
                 
                 await stream_manager.broadcast_log({
                     "id": str(uuid.uuid4()),
@@ -841,6 +986,80 @@ class DerivConnector:
         except Exception as e:
             logger.error(f"Execution Error: {e}")
             return {"status": "error", "message": str(e)}
+
+    async def monitor_positions_for_sl_tp(self, current_price: float, symbol: str):
+        """
+        Monitor open positions and close them if local SL/TP thresholds are hit.
+        This is used for Options (CALL/PUT) which don't support native limit_order.
+        """
+        closed_contracts = []
+        
+        for contract_id, meta in list(self.contract_metadata.items()):
+            if meta.get('symbol') != symbol:
+                continue
+                
+            entry_price = meta.get('entry_price')
+            sl_price = meta.get('stop_loss')
+            tp_price = meta.get('take_profit')
+            action = meta.get('action', 'BUY')
+            
+            if not entry_price:
+                continue
+            
+            should_close = False
+            close_reason = ""
+            
+            # For BUY trades (CALL options)
+            if action == "BUY":
+                if sl_price and current_price <= sl_price:
+                    should_close = True
+                    close_reason = f"Stop Loss Hit (Price: {current_price} <= SL: {sl_price})"
+                elif tp_price and current_price >= tp_price:
+                    should_close = True
+                    close_reason = f"Take Profit Hit (Price: {current_price} >= TP: {tp_price})"
+            
+            # For SELL trades (PUT options)
+            else:
+                if sl_price and current_price >= sl_price:
+                    should_close = True
+                    close_reason = f"Stop Loss Hit (Price: {current_price} >= SL: {sl_price})"
+                elif tp_price and current_price <= tp_price:
+                    should_close = True
+                    close_reason = f"Take Profit Hit (Price: {current_price} <= TP: {tp_price})"
+            
+            if should_close:
+                logger.info(f"[LOCAL SL/TP] {close_reason} for Contract {contract_id}")
+                
+                # Close the position via Deriv API
+                try:
+                    close_req = {"sell": int(contract_id), "price": 0}
+                    close_resp = await self.send_request(close_req)
+                    
+                    if 'error' in close_resp:
+                        logger.error(f"Failed to close contract {contract_id}: {close_resp['error']}")
+                    else:
+                        logger.info(f"Successfully closed contract {contract_id}")
+                        await stream_manager.broadcast_notification(
+                            "Position Closed",
+                            close_reason,
+                            "info"
+                        )
+                        await stream_manager.broadcast_log({
+                            "id": str(uuid.uuid4()),
+                            "timestamp": datetime.now().isoformat(),
+                            "message": f"Closed {action} position on {symbol}: {close_reason}",
+                            "level": "info",
+                            "source": "SL/TP Monitor"
+                        })
+                        closed_contracts.append(contract_id)
+                except Exception as e:
+                    logger.error(f"Error closing contract {contract_id}: {e}")
+        
+        # Remove closed contracts from metadata
+        for cid in closed_contracts:
+            if cid in self.contract_metadata:
+                del self.contract_metadata[cid]
+
 
     async def handle_balance(self, balance_data):
         balance = float(balance_data.get('balance', 0))
@@ -1082,6 +1301,10 @@ class DerivConnector:
         if new_symbol not in self.active_symbols:
             self.active_symbols.append(new_symbol)
             await self.subscribe_ticks()
+
+        # Reset engine and stats for clean start
+        self.engine.reset()
+        self.tick_count = 0
 
 # Global Singleton Instance
 deriv_client = DerivConnector()

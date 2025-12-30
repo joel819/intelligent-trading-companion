@@ -67,9 +67,17 @@ const Index = () => {
     isBypassed
   });
 
-  const isConnecting = botStatus.strategy === "Connecting..." || (!isConnected && !isBypassed);
+  // Stabilize connection state to prevent flickering
+  const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
 
-  if (activeTab === 'dashboard' && isConnecting && !isBypassed) {
+  if (isConnected && !hasConnectedOnce) {
+    setHasConnectedOnce(true);
+  }
+
+  // Only show full-screen loader if we have NEVER connected and aren't bypassed
+  const showFullScreenLoader = !hasConnectedOnce && !isConnected && !isBypassed;
+
+  if (activeTab === 'dashboard' && showFullScreenLoader) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-6 animate-pulse">

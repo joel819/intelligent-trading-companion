@@ -13,15 +13,14 @@ class BaseStrategy(ABC):
     def __init__(self, name: str, config: Dict[str, Any]):
         self.name = name
         self.config = config
-        from .smart_engine_v2 import SmartEngineV2
-        self.smart_engine = SmartEngineV2()
         
     @abstractmethod
     def analyze(self, 
                 tick_data: Dict, 
-                regime_data: Dict, 
+                engine: Any, # MasterEngine
                 structure_data: Dict, 
-                indicator_data: Dict) -> Optional[Dict]:
+                indicator_data: Dict,
+                h1_candles: List[Dict] = None) -> Optional[Dict]:
         """
         Analyze markets and generate a signal.
         
@@ -42,11 +41,37 @@ class BaseStrategy(ABC):
     def update_config(self, new_config: Dict):
         self.config.update(new_config)
 
-    def check_exit(self, position: Dict, candles: List[Dict]) -> Dict:
+    def calculate_sl_tp(self, price: float, atr: float, direction: str, rr_ratio: float = 1.5) -> tuple[float, float]:
         """
-        Check if an open position should be exited based on SmartEngine logic.
-        Delegates to SmartEngine.generate_exit_decision.
+        Calculate Dynamic Stop Loss and Take Profit based on ATR.
+        
+        Args:
+            price: Current price
+            atr: Current ATR(14) or similar volatility metric
+            direction: "BUY" or "SELL"
+            rr_ratio: Target Risk:Reward Ratio
+            
+        Returns:
+            Tuple (sl_dist, tp_dist) in POINTS/PRICE DELTA
         """
-        if hasattr(self, 'smart_engine'):
-             return self.smart_engine.generate_exit_decision(position, candles)
-        return {"close_now": False, "new_sl": None, "new_tp": None}
+        # Default Multipliers
+        atr_sl_mult = self.config.get("atr_sl_multiplier", 2.0)
+        min_sl = self.config.get("sl_points_min", 5.0)
+        max_sl = self.config.get("sl_points_max", 50.0)
+        
+        # SL Distance = ATR * Multiplier
+        # If ATR is 0 (no history), fallback to safe default (max_sl / 2)
+        if atr <= 0:
+            sl_dist = min_sl * 2
+        else:
+            sl_dist = atr * atr_sl_mult
+            
+        # Clamp SL
+        sl_dist = max(min_sl, min(sl_dist, max_sl))
+        
+        # TP Distance based on RR
+        tp_dist = sl_dist * rr_ratio
+        
+        # Round to 2 decimals for cleaner output
+        return round(sl_dist, 2), round(tp_dist, 2)
+

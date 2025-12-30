@@ -25,7 +25,7 @@ class EntryValidator:
         Args:
             structure_data: Result from MarketStructure.analyze()
             indicator_data: Result from IndicatorLayer.analyze()
-            volatility_valid: Boolean from VolatilityFilter
+            volatility_valid: Boolean (from MasterEngine or external check)
             
         Returns:
             Dict with action and confidence, or None if no trade.

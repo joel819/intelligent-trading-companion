@@ -37,6 +37,9 @@ STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
     # Boom/Crash 500
     "BOOM_500": Boom300SafeStrategy, "BOOM500": Boom300SafeStrategy,
     "CRASH_500": Crash300SafeStrategy, "CRASH500": Crash300SafeStrategy,
+    
+    # Forex Pairs
+    "FRXEURUSD": V10SuperSafeStrategy,
 }
 
 # Friendly names for UI display
@@ -55,6 +58,7 @@ STRATEGY_DISPLAY_NAMES: Dict[str, str] = {
     "BOOM500": "Boom 500 Safe",
     "CRASH_500": "Crash 500 Safe",
     "CRASH500": "Crash 500 Safe",
+    "FRXEURUSD": "Forex EUR/USD Safe",
 }
 
 

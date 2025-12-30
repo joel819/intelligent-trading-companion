@@ -46,25 +46,33 @@ class Crash300SafeStrategy(BaseStrategy):
         # Internal history
         self.tick_history = deque(maxlen=50)
 
-    def analyze(self, tick_data, regime_data, structure_data, indicator_data) -> Optional[Dict]:
+    def analyze(self, tick_data, engine, structure_data, indicator_data, h1_candles=None) -> Optional[Dict]:
         """
-        Analyze logic for Crash 300 Safe Mode.
+        Analyze logic for Crash 300 Safe Mode using MasterEngine.
         """
         # 1. Update Internal History
         price = float(tick_data.get('quote', 0))
         self.tick_history.append(price)
         
-        if len(self.tick_history) < 20:
+        if len(self.tick_history) < 20: 
             return None
             
         # Indicators
         rsi = indicator_data.get('rsi', 50)
         ma_trend = indicator_data.get('ma_trend', 'neutral')
         ma_slope = indicator_data.get('ma_slope', 0)
-        atr = regime_data.get('atr', 0)
+        
+        # MasterEngine status
+        volatility_state = engine.get_volatility("1m")
+        candles_1m = list(engine.candles_1m)
+        market_mode = engine.detect_market_mode(candles_1m)
+        noise_detected = engine.detect_noise(candles_1m)
+        
+        # === PRE-CHECKS ===
+        if noise_detected or market_mode == "chaotic":
+            return None
         
         # === RULE 1: Trend Direction (BUY ONLY) ===
-        # EMA50 > EMA200 -> Uptrend
         if self.config["require_uptrend"]:
             if ma_trend != "bullish":
                 return None
@@ -73,12 +81,16 @@ class Crash300SafeStrategy(BaseStrategy):
         if ma_slope <= self.config["min_slope"]:
              return None
 
-        # === RULE 3: RSI Pullback (RSI < 40) ===
-        if rsi >= self.config["rsi_max"]:
+        # === RULE 3: RSI HYBRID MODE FILTER (Replaces old RSI check) ===
+        rsi_hybrid = None
+        if hasattr(engine, 'indicator_layer'):
+            rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("BUY")
+        
+        if rsi_hybrid and not rsi_hybrid.get("allow_buy", True):
             return None
             
-        # === RULE 4: ATR Normal ===
-        if regime_data.get('volatility') == 'extreme':
+        # === RULE 4: Volatility ===
+        if volatility_state == 'extreme':
             return None
 
         # === RULE 5: No spike in last 3 candles ===
@@ -86,37 +98,49 @@ class Crash300SafeStrategy(BaseStrategy):
         if self._has_recent_spike(threshold=self.config["spike_threshold_pips"]):
             return None
             
-        # === SMART ENGINE INTEGRATION ===
-        candles = structure_data.get('candles', [])
+        # 3. Calculate Confidence via MasterEngine
+        mtf_data = engine._analyze_mtf_trend()
+        patterns = engine.detect_patterns(candles_1m)
         
-        # 1. Detect Market Mode
-        market_mode = self.smart_engine.detect_market_mode(candles)
-        
-        # 2. Check Noise / Chaos
-        noise_detected = self.smart_engine.detect_noise(candles)
-        
-        if noise_detected or market_mode == "chaotic":
-            # Strategies must STOP and return no trade if noise detected or chaotic
-            return None
-
-        # 3. Calculate Confidence via SmartEngine
-        filters = {
-            "trend_ok": ma_trend == "bullish" if self.config["require_uptrend"] else True,
-            "momentum_ok": rsi < 40,  # Pullback condition
-            "volatility_ok": regime_data.get('volatility') != 'extreme',
-            "candle_ok": not self._has_recent_spike(threshold=self.config["spike_threshold_pips"]),
-            "market_mode": market_mode
+        conf_data = {
+            "signal_direction": "BUY",
+            "patterns": patterns,
+            "market_mode": market_mode,
+            "mtf_trend": mtf_data,
+            "volatility": volatility_state,
+            "momentum": rsi
         }
         
-        smart_confidence = self.smart_engine.calculate_confidence(filters)
+        smart_confidence = engine.calculate_confidence(conf_data)
+        
+        # Apply RSI Hybrid Mode confidence modifier
+        if rsi_hybrid:
+            smart_confidence += rsi_hybrid.get("confidence_modifier", 0) * 100
         
         if smart_confidence < 40:
             return None
 
+        # --- Dynamic SL/TP Calculation ---
+        import numpy as np
+        closes = np.array([c['close'] for c in candles_1m])
+        highs = np.array([c['high'] for c in candles_1m])
+        lows = np.array([c['low'] for c in candles_1m])
+        
+        curr_atr = 0.0
+        if len(closes) > 15:
+            tr1 = highs[1:] - lows[1:]
+            tr2 = np.abs(highs[1:] - closes[:-1])
+            tr3 = np.abs(lows[1:] - closes[:-1])
+            tr = np.maximum(tr1, np.maximum(tr2, tr3))
+            curr_atr = np.mean(tr[-14:])
+
+        sl_dist, tp_dist = self.calculate_sl_tp(price, curr_atr, "BUY", rr_ratio=1.5)
+        logger.info(f"[CRASH300] Dynamic Sizing: ATR={curr_atr:.3f} -> SL={sl_dist}, TP={tp_dist}")
+
         return {
             "action": "buy",
-            "tp": self.config["tp_points"],
-            "sl": self.config["sl_points"],
+            "tp": tp_dist,
+            "sl": sl_dist,
             "confidence": smart_confidence,
             "market_mode": market_mode,
             "strategy": self.name

@@ -8,7 +8,6 @@ from typing import Dict, Optional, List
 import logging
 import datetime
 from .strategy_selector import get_strategy, list_available_symbols, get_strategy_name
-from .smart_engine_v2 import SmartEngineV2
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,6 @@ class StrategyManager:
     def __init__(self):
         self.current_symbol: Optional[str] = None
         self.current_strategy = None
-        self.smart_engine = SmartEngineV2()
         
     def select_strategy_by_symbol(self, symbol: str) -> bool:
         """
@@ -60,9 +58,10 @@ class StrategyManager:
     def run_strategy(self, 
                     symbol: str,
                     tick_data: Dict, 
-                    regime_data: Dict, 
+                    engine, # MasterEngine instance
                     structure_data: Dict, 
-                    indicator_data: Dict) -> Optional[Dict]:
+                    indicator_data: Dict,
+                    h1_candles: List[Dict] = None) -> Optional[Dict]:
         """
         Run strategy analysis for the given symbol, enhanced by SmartEngine V2.
         
@@ -82,11 +81,8 @@ class StrategyManager:
                 logger.error(f"Cannot run strategy - failed to select for symbol: {symbol}")
                 return None
         
-        # === SMART ENGINE V2: UPDATE START ===
-        # Feed tick to engine for aggregation
-        quote = float(tick_data.get('quote', 0))
-        epoch = tick_data.get('epoch', int(datetime.datetime.now().timestamp()))
-        self.smart_engine.update_tick(symbol, quote, epoch)
+        # === SMART ENGINE: UPDATE ALREADY DONE IN DERIV CONNECTOR ===
+        # engine.update_tick is called before this method
         # =====================================
 
         if not self.current_strategy:
@@ -97,30 +93,29 @@ class StrategyManager:
             # 1. Run Base Strategy
             signal = self.current_strategy.analyze(
                 tick_data, 
-                regime_data, 
+                engine, # PASSING ENGINE instead of regime_data
                 structure_data, 
-                indicator_data
+                indicator_data,
+                h1_candles=h1_candles
             )
             
-            # === SMART ENGINE V2: ENHANCEMENT ===
+            # === MASTER ENGINE: ENHANCEMENT ===
             
-            # Fetch V2 Analysis
-            # Note: We use the 1m candles for immediate pattern scanning, 
-            # but multiframe analysis uses all history.
-            candles_1m = list(self.smart_engine.candles_1m)
+            # Fetch Analysis
+            candles_1m = list(engine.candles_1m)
             
-            market_mode = self.smart_engine.detect_market_mode(candles_1m)
-            noise_detected = self.smart_engine.detect_noise(candles_1m)
-            patterns = self.smart_engine.detect_patterns(candles_1m)
-            mtf_trend = self.smart_engine.analyze_multi_timeframe()
+            market_mode = engine.detect_market_mode(candles_1m)
+            noise_detected = engine.detect_noise(candles_1m)
+            patterns = engine.detect_patterns(candles_1m)
+            mtf_trend = engine.analyze_multi_timeframe() if hasattr(engine, 'analyze_multi_timeframe') else engine._analyze_mtf_trend()
             
             # Global BLOCK Rules
             if market_mode == "chaotic":
-                # logger.debug(f"SmartEngineV2 Block: Chaotic Market ({symbol})")
+                logger.debug(f"MasterEngine Block: Chaotic Market ({symbol})")
                 return None
                 
             if noise_detected:
-                # logger.debug(f"SmartEngineV2 Block: Noise Detected ({symbol})")
+                logger.debug(f"MasterEngine Block: Noise Detected ({symbol})")
                 return None
             
             # DEBUG: Heartbeat
@@ -131,31 +126,37 @@ class StrategyManager:
                 logger.info(f"DEBUG: Strategy for {symbol} produced raw signal: {signal}")
                 
                 # Calculate V2 Confidence
-                # We interpret the strategy's signal direction for the validation
-                algo_filters = {
-                    "direction": signal.get("action", "ANY").upper(),
-                    "strategy_confidence": signal.get("confidence", 50)
-                }
+                # If strategy already provided a robust confidence score, use it.
+                # Otherwise, use MasterEngine to calculate a generic score.
                 
-                v2_confidence = self.smart_engine.calculate_confidence(
-                    algo_filters, patterns, market_mode
-                )
+                v2_confidence = signal.get("confidence", 0)
                 
-                logger.info(f"DEBUG: SmartEngineV2 Confidence: {v2_confidence} (Threshold: 5)")
+                if v2_confidence <= 0:
+                    # Fallback Generic Calculation
+                    conf_data = {
+                        "signal_direction": signal.get("action", "ANY").upper(),
+                        "patterns": patterns,
+                        "market_mode": market_mode,
+                        "mtf_trend": mtf_trend,
+                        "volatility": engine.get_volatility("1m")
+                    }
+                    v2_confidence = engine.calculate_confidence(conf_data)
+                    logger.info(f"DEBUG: MasterEngine Generic Confidence: {v2_confidence}")
                 
-                # Confidence Cutoff
-                if v2_confidence < -1:
-                    logger.warning(f"DEBUG: Signal BLOCKED by Threshold! {v2_confidence} < -1")
+                # Confidence Cutoff (User Rule: < 45 reject)
+                # But V10 strategy forces 50+ if valid, so this should pass.
+                if v2_confidence < 45: 
+                    logger.warning(f"DEBUG: Signal BLOCKED by Confidence! {v2_confidence} < 45")
                     return None
 
                 # Update/Enrich Signal
                 signal["confidence"] = v2_confidence
                 signal["market_mode"] = market_mode
                 signal["patterns_detected"] = patterns
-                signal["multi_tf_trend"] = mtf_trend["overall_status"]
+                signal["multi_tf_trend"] = mtf_trend["trend"]
                 signal["memory_state"] = {
-                    "volatility": self.smart_engine.get_volatility_state("1m"),
-                    "wins_last_5": list(self.smart_engine.memory["results"]).count("win")
+                    "volatility": engine.get_volatility("1m"),
+                    "wins_last_5": list(engine.memory["results"]).count("win")
                 }
                 
                 # Ensure SL/TP exist (Adapter)
@@ -173,4 +174,8 @@ class StrategyManager:
     def list_available_symbols(self) -> List[str]:
         """Get list of all available trading symbols."""
         return list_available_symbols()
+
+
+# Create Singleton Instance
+strategy_manager = StrategyManager()
 

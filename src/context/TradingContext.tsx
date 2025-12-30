@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Account, Position, LogEntry, Notification, BotStatus, SkippedSignal } from '@/types/trading';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface TradingContextType {
     isConnected: boolean;
@@ -56,6 +57,8 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         symbol: '---'
     });
 
+    const { showNotification } = useNotifications();
+
     // 1. Fetch Bot status
     const { data: botStatus = {
         isConnected: false,
@@ -74,12 +77,14 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
     });
 
     useEffect(() => {
-        setIsConnected(botStatus.isConnected);
+        // REMOVED: setIsConnected(botStatus.isConnected); 
+        // We rely SOLELY on WebSocket for connection state to prevent race conditions/flickering.
+
         // Sync selectedSymbol with backend if it changes (e.g. from another client or on initial load)
         if (botStatus.symbol && botStatus.symbol !== selectedSymbol) {
             setSelectedSymbol(botStatus.symbol);
         }
-    }, [botStatus.isConnected, botStatus.symbol]);
+    }, [botStatus.symbol]);
 
     useEffect(() => {
         setDerivTicks([]);
@@ -209,68 +214,99 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // 6. WebSocket Stream (Singleton)
+    // 6. WebSocket Stream (with Auto-Reconnect & Debugging)
+    const wsRef = useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+    const isMounted = useRef(true);
+    const reconnectCount = useRef(0);
+    const notificationRef = useRef(showNotification);
+
+    // Keep notification ref updated without triggering useEffect re-runs
     useEffect(() => {
-        console.log("[TradingContext] Initializing WebSocket Stream...");
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.host;
-        // Vite proxy handles /stream/ws -> http://localhost:8000/stream/ws
-        const wsUrl = `${protocol}//${host}/stream/ws`;
+        notificationRef.current = showNotification;
+    }, [showNotification]);
 
-        const socket = new WebSocket(wsUrl);
+    useEffect(() => {
+        isMounted.current = true;
+        console.log("[TradingContext] WS Effect initialized. Deps: [queryClient]");
 
-        socket.onopen = () => {
-            console.log("[TradingContext] WebSocket Connected");
-            setIsConnected(true);
-        };
+        const connectWs = () => {
+            if (!isMounted.current) return;
 
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'tick') {
-                    setDerivTicks(prev => [data.data, ...prev].slice(0, 50));
-                }
-                if (data.type === 'log') {
-                    setLogs(prev => {
+            // Exponential backoff: min 1s, max 30s
+            const delay = Math.min(30000, Math.pow(2, reconnectCount.current) * 1000);
+            console.log(`[TradingContext] Connecting WebSocket (Attempt ${reconnectCount.current + 1}) in ${delay}ms...`);
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            const wsUrl = `${protocol}//${host}/stream/ws`;
+
+            const socket = new WebSocket(wsUrl);
+            wsRef.current = socket;
+
+            socket.onopen = () => {
+                if (!isMounted.current) { socket.close(); return; }
+                console.log("[TradingContext] WebSocket Connected");
+                setIsConnected(true);
+                reconnectCount.current = 0; // Reset count on success
+            };
+
+            socket.onmessage = (event) => {
+                if (!isMounted.current) return;
+                try {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'ping') return;
+
+                    if (data.type === 'tick') setDerivTicks(prev => [data.data, ...prev].slice(0, 50));
+                    if (data.type === 'log') setLogs(prev => {
                         if (prev.some(l => l.id === data.data.id)) return prev;
                         return [data.data, ...prev].slice(0, 100);
                     });
-                }
-                if (data.type === 'positions') {
-                    setPositions(data.data);
-                }
-                if (data.type === 'balance') {
-                    queryClient.setQueryData(['accounts'], (old: any) => {
+                    if (data.type === 'positions') setPositions(data.data);
+                    if (data.type === 'balance') queryClient.setQueryData(['accounts'], (old: any) => {
                         if (!Array.isArray(old)) return old;
                         return old.map(acc => acc.id === data.data.account_id ? { ...acc, ...data.data } : acc);
                     });
+                    if (data.type === 'market_status') setMarketStatus(data.data);
+                    if (data.type === 'signal_skipped') setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
+                    if (data.type === 'notification') {
+                        const { title, body } = data.data;
+                        notificationRef.current(title, { body, icon: '/favicon.ico', tag: title });
+                    }
+                } catch (e) {
+                    console.error("[TradingContext] WebSocket parse error", e);
                 }
-                if (data.type === 'market_status') {
-                    setMarketStatus(data.data);
-                }
-                if (data.type === 'signal_skipped') {
-                    setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
-                }
-            } catch (e) {
-                console.error("[TradingContext] WebSocket parse error", e);
-            }
+            };
+
+            socket.onerror = (err) => {
+                console.error("[TradingContext] WebSocket error", err);
+            };
+
+            socket.onclose = (event) => {
+                if (!isMounted.current) return;
+                console.warn(`[TradingContext] WebSocket Closed (Code: ${event.code}, Reason: ${event.reason || 'None'}). Reconnecting...`);
+                setIsConnected(false);
+
+                reconnectCount.current += 1;
+                if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+                reconnectTimeoutRef.current = setTimeout(connectWs, delay);
+            };
         };
 
-        socket.onerror = (err) => {
-            console.error("[TradingContext] WebSocket error", err);
-            setIsConnected(false);
-        };
-
-        socket.onclose = () => {
-            console.log("[TradingContext] WebSocket Closed");
-            // Only set connected false if it wasn't intentional
-            // setIsConnected(false);
-        };
+        connectWs();
 
         return () => {
-            console.log("[TradingContext] Closing WebSocket Stream...");
-            socket.close();
+            console.log("[TradingContext] Cleanup WebSocket effect...");
+            isMounted.current = false;
+            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+            if (wsRef.current) {
+                wsRef.current.onclose = null; // Prevent onclose loop
+                wsRef.current.close();
+                wsRef.current = null;
+            }
         };
-    }, [queryClient]);
+    }, [queryClient]); // Removed showNotification to prevent re-runs
 
     const value: TradingContextType = {
         accounts,

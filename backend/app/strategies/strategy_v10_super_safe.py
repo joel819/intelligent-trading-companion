@@ -77,7 +77,7 @@ class V10SuperSafeStrategy(BaseStrategy):
             "cooldown_consecutive_losses": 3000,  # 50 minutes
         })
         
-    def analyze(self, tick_data, regime_data, structure_data, indicator_data) -> Optional[Dict]:
+    def analyze(self, tick_data, engine, structure_data, indicator_data, h1_candles=None) -> Optional[Dict]:
         """
         Analyze market conditions and generate V10 Super Safe signals.
         
@@ -108,61 +108,98 @@ class V10SuperSafeStrategy(BaseStrategy):
         candle_range = high - low
         candle_body = abs(price - tick_data.get('open', price))
         
-        # === FILTER 1: Volatility Checks (handled by VolatilityFilter externally) ===
-        # We assume volatility_filter.is_valid() has already passed
+        # === FILTER 1: Volatility Checks (handled by MasterEngine) ===
+        # We assume MasterEngine.detect_noise() has already passed
         
-        # === SMART ENGINE PRE-CHECKS ===
-        candles = structure_data.get('candles', [])
-        market_mode = self.smart_engine.detect_market_mode(candles)
-        noise_detected = self.smart_engine.detect_noise(candles)
+        # === MASTER ENGINE PRE-CHECKS ===
+        candles_1m = list(engine.candles_1m)
+        market_mode = engine.detect_market_mode(candles_1m)
+        noise_detected = engine.detect_noise(candles_1m)
+        mtf_data = engine._analyze_mtf_trend()
+        patterns = engine.detect_patterns(candles_1m)
+        volatility_state = engine.get_volatility("1m")
         
-        if noise_detected or market_mode == "chaotic":
-            # logger.debug(f"[V10] Trade rejected: SmartEngine noise={noise_detected}, mode={market_mode}")
-            # return None
-            pass
+        mtf_trend = mtf_data.get("trend", "neutral")
         
-        # === FILTER 2: Trend Validation (DISABLED FOR TEST MODE) ===
-        # if abs(ma_slope) < self.config["sideways_slope_threshold"]:
-        #     logger.debug(f"[V10] Trade rejected: Sideways market (MA slope: {ma_slope:.5f})")
-        #     return None
+        if noise_detected:
+             return None
+             
+        if market_mode == "chaotic":
+             return None
+        
+        # === FILTER 2: Trend Validation (ENABLED) ===
+        if abs(ma_slope) < self.config["sideways_slope_threshold"]:
+            logger.info(f"[V10] Trade rejected: Sideways market (MA slope: {ma_slope:.5f})")
+            return None
             
         # if adx < self.config["adx_threshold"]:
-        #     logger.debug(f"[V10] Trade rejected: Weak trend (ADX: {adx:.1f})")
+        #     logger.info(f"[V10] Trade rejected: Weak trend (ADX: {adx:.1f})")
         #     return None
             
         # if abs(ma_slope) < self.config["min_ma_slope"]:
-        #     logger.debug(f"[V10] Trade rejected: MA slope too flat ({ma_slope:.5f})")
+        #     logger.info(f"[V10] Trade rejected: MA slope too flat ({ma_slope:.5f})")
         #     return None
         
-        # === FILTER 3: Candle Quality (DISABLED FOR TEST MODE) ===
+        # === FILTER 3: Candle Quality ===
         # if self.config["reject_wick_spikes"] and candle_range > 0:
-        #     # body_pct = candle_body / candle_range if candle_range > 0 else 0
         #     pass
-            # ... (Rest of logic commented out handled by pass)
         
         # === ENTRY LOGIC: BUY CONDITIONS ===
-        if ma_trend == "bullish": # Restored trend Check
+        # Allow BULLISH or NEUTRAL trend if RSI supports it
+        if ma_trend == "bullish" or (ma_trend == "neutral" and rsi > 50):
             
-            # Check RSI range (DISABLED)
-            # if not (self.config["rsi_buy_min"] <= rsi <= self.config["rsi_buy_max"]):
-            #     return None
-                
-            # Check MACD (DISABLED)
-            # if self.config["require_macd_confirmation"] and macd_hist <= 0:
-            #     return None
+            # --- MTF FILTER (1-Hour Alignment) ---
+            if mtf_trend == "bearish":
+                logger.info(f"[V10] BUY rejected: H1 Trend is Bearish")
+                return None
+            
+            # --- RSI HYBRID MODE FILTER ---
+            # Access the IndicatorLayer from DerivConnector (passed via engine or indicator_data)
+            # Assuming indicator_data has a reference to the layer OR we use the stored data
+            rsi_hybrid = None
+            if hasattr(engine, 'indicator_layer'):
+                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("BUY")
+            
+            if rsi_hybrid and not rsi_hybrid.get("allow_buy", True):
+                logger.info(f"[V10] BUY rejected by RSI Hybrid Mode: {rsi_hybrid.get('summary')}")
+                return None
             
             # All conditions met for BUY
-            filters = {
-                "trend_ok": True, # Forcing True
-                "momentum_ok": True,
-                "volatility_ok": regime_data.get('volatility') != 'extreme',
-                "candle_ok": True, 
-                "market_mode": market_mode
+            conf_data = {
+                "signal_direction": "BUY",
+                "patterns": patterns,
+                "market_mode": market_mode,
+                "mtf_trend": mtf_data,
+                "volatility": volatility_state,
+                "momentum": rsi
             }
-            smart_confidence = self.smart_engine.calculate_confidence(filters, [], market_mode)
+            smart_confidence = engine.calculate_confidence(conf_data)
+            
+            # Apply RSI Hybrid Mode confidence modifier
+            if rsi_hybrid:
+                smart_confidence += rsi_hybrid.get("confidence_modifier", 0) * 100
             
             if smart_confidence < 5:
                pass
+            
+            # --- Dynamic SL/TP Calculation ---
+            # Calculate ATR(14) from 1m candles for accurate sizing
+            import numpy as np
+            closes = np.array([c['close'] for c in candles_1m])
+            highs = np.array([c['high'] for c in candles_1m])
+            lows = np.array([c['low'] for c in candles_1m])
+            
+            curr_atr = 0
+            if len(closes) > 15:
+                # Use engine's method if available, else manual
+                tr1 = highs[1:] - lows[1:]
+                tr2 = np.abs(highs[1:] - closes[:-1])
+                tr3 = np.abs(lows[1:] - closes[:-1])
+                tr = np.maximum(tr1, np.maximum(tr2, tr3))
+                curr_atr = np.mean(tr[-14:]) # Simple ATR approximation
+            
+            sl_dist, tp_dist = self.calculate_sl_tp(price, curr_atr, "BUY", rr_ratio=1.4)
+            logger.info(f"[V10] Dynamic Sizing: ATR={curr_atr:.3f} -> SL={sl_dist}, TP={tp_dist}")
 
             logger.info(
                 f"[V10_SUPER_SAFE] BUY Signal (TEST MODE) | "
@@ -171,50 +208,87 @@ class V10SuperSafeStrategy(BaseStrategy):
             
             return {
                 "action": "BUY",
-                "tp": self.config["tp_points_min"] + 5, 
-                "sl": self.config["sl_points_min"],
-                "confidence": max(50, smart_confidence), # Boost confidence for v2 check
+                "tp": tp_dist, 
+                "sl": sl_dist,
+                "confidence": max(50, smart_confidence), 
                 "market_mode": market_mode,
                 "strategy": self.name,
                 "details": {
                     "trend": "bullish",
-                    "entry_type": "test_mode_forced"
+                    "entry_type": "test_mode_forced",
+                    "mtf": mtf_trend
                 }
             }
         
         # === ENTRY LOGIC: SELL CONDITIONS ===
-        if ma_trend == "bearish": # Removed slope/structure requirement
+        # Allow BEARISH or NEUTRAL trend if RSI supports it
+        if ma_trend == "bearish" or (ma_trend == "neutral" and rsi < 50): 
             
-            # Check RSI range (DISABLED)
-            # if not (self.config["rsi_sell_min"] <= rsi <= self.config["rsi_sell_max"]):
-            #     return None
+            # --- MTF FILTER (1-Hour Alignment) ---
+            if mtf_trend == "bullish":
+                logger.info(f"[V10] SELL rejected: H1 Trend is Bullish")
+                return None
+            
+            # --- RSI HYBRID MODE FILTER ---
+            rsi_hybrid = None
+            if hasattr(engine, 'indicator_layer'):
+                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("SELL")
+            
+            if rsi_hybrid and not rsi_hybrid.get("allow_sell", True):
+                logger.info(f"[V10] SELL rejected by RSI Hybrid Mode: {rsi_hybrid.get('summary')}")
+                return None
             
             # All conditions met for SELL
-            filters = {
-                "trend_ok": True, 
-                "momentum_ok": True,
-                "volatility_ok": regime_data.get('volatility') != 'extreme',
-                "candle_ok": True, 
-                "market_mode": market_mode
+            conf_data = {
+                "signal_direction": "SELL",
+                "patterns": patterns,
+                "market_mode": market_mode,
+                "mtf_trend": mtf_data,
+                "volatility": volatility_state,
+                "momentum": rsi
             }
-            smart_confidence = self.smart_engine.calculate_confidence(filters, [], market_mode)
+            smart_confidence = engine.calculate_confidence(conf_data)
             
-            if smart_confidence < 5:
+            # Apply RSI Hybrid Mode confidence modifier
+            if rsi_hybrid:
+                smart_confidence += rsi_hybrid.get("confidence_modifier", 0) * 100
+            
+            if smart_confidence < 50:
                 pass
                 
+            # --- Dynamic SL/TP Calculation (SELL) ---
+            import numpy as np
+            closes = np.array([c['close'] for c in candles_1m])
+            highs = np.array([c['high'] for c in candles_1m])
+            lows = np.array([c['low'] for c in candles_1m])
+            
+            curr_atr = 0
+            if len(closes) > 15:
+                tr1 = highs[1:] - lows[1:]
+                tr2 = np.abs(highs[1:] - closes[:-1])
+                tr3 = np.abs(lows[1:] - closes[:-1])
+                tr = np.maximum(tr1, np.maximum(tr2, tr3))
+                curr_atr = np.mean(tr[-14:])
+            
+            sl_dist, tp_dist = self.calculate_sl_tp(price, curr_atr, "SELL", rr_ratio=1.4)
+            logger.info(f"[V10] Dynamic Sizing (SELL): ATR={curr_atr:.3f} -> SL={sl_dist}, TP={tp_dist}")
+
             logger.info(
-                f"[V10_SUPER_SAFE] SELL Signal (TEST MODE) | "
-                f"Trend: bearish | Confidence: {smart_confidence:.2f}"
+                f"[V10_SUPER_SAFE] SELL Signal | "
+                f"Trend: bearish | Conf: {smart_confidence:.2f} | MTF: {mtf_trend}"
             )
             
             return {
                 "action": "SELL",
-                "tp": self.config["tp_points_min"] + 5,
-                "sl": self.config["sl_points_min"],
-                "confidence": max(50, smart_confidence), # Boost for v2 check
+                "tp": tp_dist,
+                "sl": sl_dist,
+                "confidence": smart_confidence, 
                 "market_mode": market_mode,
                 "strategy": self.name,
-                "details": {"entry_type": "test_mode_forced"}
+                "details": {
+                    "trend": ma_trend,
+                    "mtf": mtf_trend
+                }
             }
     
     def _calculate_confidence(self, structure_score: float, rsi: float, macd_hist: float, direction: str) -> float:

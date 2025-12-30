@@ -23,6 +23,9 @@ class IndicatorLayer:
         self.rsi_oversold = 30.0
         self.rsi_overbought = 70.0
         
+        # RSI Hybrid Mode: History for slope/volatility calculations
+        self.rsi_history = deque(maxlen=10)
+        
         # V10-specific RSI ranges
         self.v10_rsi_buy_min = 48
         self.v10_rsi_buy_max = 62
@@ -48,6 +51,9 @@ class IndicatorLayer:
              return {"score": 50, "rsi": 50, "bias": "neutral", "ma_trend": "neutral", "ma_slope": 0, "adx": 0}
              
         rsi = self._calculate_rsi()
+        # Update RSI Hybrid Mode history
+        self.rsi_history.append(rsi)
+        
         macd_val, signal_val, hist_val = self._calculate_macd()
         ma_trend, ma_slope = self._check_ma_trend()
         adx = self._calculate_adx()
@@ -160,6 +166,155 @@ class IndicatorLayer:
             
         rs = avg_gain / avg_loss
         return 100.0 - (100.0 / (1.0 + rs))
+    
+    # ===============================================
+    # RSI HYBRID MODE METHODS
+    # ===============================================
+    
+    def get_rsi_flow(self) -> str:
+        """
+        RSI Trend Flow:
+        - rsi > 50 → bullish flow
+        - rsi < 50 → bearish flow
+        
+        Returns:
+            "bullish", "bearish", or "neutral" (exactly at 50)
+        """
+        if len(self.rsi_history) < 1:
+            return "neutral"
+        
+        current_rsi = self.rsi_history[-1]
+        
+        if current_rsi > 50:
+            return "bullish"
+        elif current_rsi < 50:
+            return "bearish"
+        else:
+            return "neutral"
+    
+    def get_rsi_slope(self) -> dict:
+        """
+        RSI Slope Momentum:
+        - If RSI_current > RSI_previous → momentum_up = true
+        - If RSI_current < RSI_previous → momentum_down = true
+        
+        Returns:
+            dict with momentum_up, momentum_down, and slope_value
+        """
+        if len(self.rsi_history) < 2:
+            return {"momentum_up": False, "momentum_down": False, "slope_value": 0.0}
+        
+        current_rsi = self.rsi_history[-1]
+        previous_rsi = self.rsi_history[-2]
+        slope_value = current_rsi - previous_rsi
+        
+        return {
+            "momentum_up": current_rsi > previous_rsi,
+            "momentum_down": current_rsi < previous_rsi,
+            "slope_value": slope_value
+        }
+    
+    def get_rsi_volatility(self) -> dict:
+        """
+        RSI Volatility State:
+        - Calculate rsi_volatility = abs(RSI_current - RSI_previous)
+        - If rsi_volatility < 2 → state = "flat"
+        - If rsi_volatility between 2 and 5 → state = "normal"
+        - If rsi_volatility > 5 → state = "expanding"
+        
+        Returns:
+            dict with state, volatility_value, and confidence_modifier
+        """
+        if len(self.rsi_history) < 2:
+            return {"state": "flat", "volatility_value": 0.0, "confidence_modifier": -0.1}
+        
+        current_rsi = self.rsi_history[-1]
+        previous_rsi = self.rsi_history[-2]
+        rsi_volatility = abs(current_rsi - previous_rsi)
+        
+        if rsi_volatility < 2:
+            state = "flat"
+            confidence_modifier = -0.1  # Reduce confidence, avoid entries
+        elif rsi_volatility <= 5:
+            state = "normal"
+            confidence_modifier = 0.0   # Neutral
+        else:
+            state = "expanding"
+            confidence_modifier = 0.05  # Slight increase in confidence
+        
+        return {
+            "state": state,
+            "volatility_value": rsi_volatility,
+            "confidence_modifier": confidence_modifier
+        }
+    
+    def get_rsi_confirmation(self, direction: str = None) -> dict:
+        """
+        RSI Hybrid Mode: Combined confirmation for trade entries.
+        
+        Args:
+            direction: Optional "BUY" or "SELL" to check against.
+        
+        Returns:
+            dict with:
+                - allow_buy: bool
+                - allow_sell: bool
+                - flow: str ("bullish", "bearish", "neutral")
+                - momentum_up: bool
+                - momentum_down: bool
+                - volatility_state: str ("flat", "normal", "expanding")
+                - confidence_modifier: float
+                - rsi_value: float
+                - summary: str (human-readable)
+        """
+        flow = self.get_rsi_flow()
+        slope = self.get_rsi_slope()
+        volatility = self.get_rsi_volatility()
+        
+        current_rsi = self.rsi_history[-1] if len(self.rsi_history) > 0 else 50.0
+        
+        # Decision Logic:
+        # BUY: flow is bullish AND momentum_up is true
+        # SELL: flow is bearish AND momentum_down is true
+        # If volatility_state = "flat", reduce confidence but DON'T completely block
+        
+        allow_buy = (flow == "bullish" and slope["momentum_up"])
+        allow_sell = (flow == "bearish" and slope["momentum_down"])
+        
+        # Flat volatility: Instead of blocking, we just reduce confidence
+        # This allows trades in slow-moving markets while still penalizing them
+        # The complete block was too restrictive and prevented trades for hours
+        
+        # Build summary
+        summary = f"RSI={current_rsi:.1f} | Flow={flow} | Mom={'↑' if slope['momentum_up'] else ('↓' if slope['momentum_down'] else '→')} | Vol={volatility['state']}"
+        if allow_buy:
+            summary += " → BUY OK"
+        elif allow_sell:
+            summary += " → SELL OK"
+        else:
+            summary += " → NO ENTRY"
+        
+        result = {
+            "allow_buy": allow_buy,
+            "allow_sell": allow_sell,
+            "flow": flow,
+            "momentum_up": slope["momentum_up"],
+            "momentum_down": slope["momentum_down"],
+            "volatility_state": volatility["state"],
+            "confidence_modifier": volatility["confidence_modifier"],
+            "rsi_value": current_rsi,
+            "summary": summary
+        }
+        
+        # If direction is specified, log the decision
+        if direction:
+            if direction.upper() == "BUY" and not allow_buy:
+                logger.debug(f"[RSI Hybrid] BUY blocked: {summary}")
+            elif direction.upper() == "SELL" and not allow_sell:
+                logger.debug(f"[RSI Hybrid] SELL blocked: {summary}")
+        
+        return result
+
         
     def _calculate_macd(self, fast=12, slow=26, signal=9):
         # Extremely simplified MACD for tick stream
