@@ -7,6 +7,7 @@ Provides clean, scalable multi-pair strategy selection.
 from typing import Type, Dict
 from .base_strategy import BaseStrategy
 from .strategy_v10_super_safe import V10SuperSafeStrategy
+from .strategy_v75_super_safe import V75SuperSafeStrategy
 from .boom300_safe_strategy import Boom300SafeStrategy
 from .crash300_safe_strategy import Crash300SafeStrategy
 
@@ -31,7 +32,7 @@ STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
     "R_10": V10SuperSafeStrategy,
     "R_25": V10SuperSafeStrategy, "R25": V10SuperSafeStrategy,
     "R_50": V10SuperSafeStrategy, "R50": V10SuperSafeStrategy,
-    "R_75": V10SuperSafeStrategy, "R75": V10SuperSafeStrategy,
+    "R_75": V75SuperSafeStrategy, "R75": V75SuperSafeStrategy,
     "R_100": V10SuperSafeStrategy, "R100": V10SuperSafeStrategy,
     
     # Boom/Crash 500

@@ -17,6 +17,33 @@ from app.exits.dynamic_tp import DynamicTakeProfit
 from app.risk.weighted_lots import WeightedLotCalculator
 from app.risk.risk_guard import RiskGuard
 from app.risk.cooldown_manager import CooldownManager
+from app.strategies.master_engine import MasterEngine
+from app.strategies.strategy_manager import StrategyManager
+
+class SymbolProcessor:
+    """Manages the full analysis stack for a single symbol."""
+    def __init__(self, symbol: str, config: Dict[str, Any] = None):
+        self.symbol = symbol
+        self.engine = MasterEngine()
+        self.market_structure = MarketStructure()
+        self.indicator_layer = IndicatorLayer()
+        self.entry_validator = EntryValidator()
+        self.strategy_manager = StrategyManager()
+        self.strategy_manager.select_strategy_by_symbol(symbol)
+        
+        # Apply config if provided
+        if config and hasattr(self.indicator_layer, 'update_params'):
+            self.indicator_layer.update_params(
+                rsi_oversold = config.get("rsi_oversold"),
+                rsi_overbought = config.get("rsi_overbought")
+            )
+            
+        # Link for RSI Hybrid Mode
+        self.engine.indicator_layer = self.indicator_layer
+        
+        # Exits
+        self.smart_sl = SmartStopLoss()
+        self.dynamic_tp = DynamicTakeProfit()
 
 # Deriv API Endpoint
 DERIV_WS_BASE_URL = "wss://ws.derivws.com/websockets/v3"
@@ -50,7 +77,6 @@ class DerivConnector:
         
         self.req_id_counter = 100 
         self.tick_count = 0
-        self.target_symbol = "R_10" # Defaulting to R_10 per user request
         self.processed_contracts = set()
         
         # Session Stats
@@ -61,34 +87,14 @@ class DerivConnector:
             "losses": 0
         }
 
-        # --- ZONE UPGRADES INITIALIZATION ---
-        from app.strategies.strategy_manager import strategy_manager
-        from app.strategies.master_engine import MasterEngine
+        # Symbol Processing Units
+        self.processors: Dict[str, SymbolProcessor] = {}
+        self.enabled_symbols = ["R_10", "R_75"] # Both enabled by default
         
-        # Intelligence
-        # Intelligence - Unified Master Engine
-        self.engine = MasterEngine()
-        
-        # Signals
-        self.market_structure = MarketStructure()
-        self.indicator_layer = IndicatorLayer()
-        self.entry_validator = EntryValidator()
-        
-        # Link indicator_layer to engine for RSI Hybrid Mode access
-        self.engine.indicator_layer = self.indicator_layer
-        
-        # Exits
-        self.smart_sl = SmartStopLoss()
-        self.dynamic_tp = DynamicTakeProfit()
-        
-        # Risk
+        # Risk & Shared Services (Shared across all pairs)
         self.lot_calculator = WeightedLotCalculator()
         self.risk_guard = RiskGuard()
-        # Reduced cooldown for increased trade frequency (30 seconds instead of 60)
         self.cooldown_manager = CooldownManager(default_cooldown_seconds=30)
-        
-        # Strategy
-        self.strategy_manager = strategy_manager
         
         # Local Contract Memory (SL/TP Tracking)
         # Local Contract Memory (SL/TP Tracking)
@@ -133,7 +139,8 @@ class DerivConnector:
 
     def apply_config_updates(self, config: Dict[str, Any]):
         """Apply dynamic configuration updates to sub-services."""
-        pass
+        # Update internal defaults for future processors
+        self.default_config.update(config)
             
         # Update Risk Guard
         if hasattr(self.risk_guard, 'update_params'):
@@ -143,14 +150,15 @@ class DerivConnector:
                 max_active_trades = config.get("max_open_trades")
             )
             
-        # Update Indicator Layer (RSI levels)
-        if hasattr(self.indicator_layer, 'update_params'):
-            self.indicator_layer.update_params(
-                rsi_oversold = config.get("rsi_oversold"),
-                rsi_overbought = config.get("rsi_overbought")
-            )
+        # Update all active processors
+        for symbol, p in self.processors.items():
+            if hasattr(p.indicator_layer, 'update_params'):
+                p.indicator_layer.update_params(
+                    rsi_oversold = config.get("rsi_oversold"),
+                    rsi_overbought = config.get("rsi_overbought")
+                )
             
-        logger.info("Dynamic configuration applied to sub-services.")
+        logger.info("Dynamic configuration applied to active processors.")
 
     async def connect(self):
         while True:
@@ -460,16 +468,8 @@ class DerivConnector:
                         else: q.append(candle)
                         
                         # Sync with Engine
-                        # If the symbol matches the target or we want engine to be multi-asset (current MasterEngine is single asset implicitly or needs dict)
-                        # Current MasterEngine seems single-instance single-state (candles_1m, etc.)
-                        # If we trade multiple symbols, we need one Engine per symbol OR Engine handles dicts.
-                        # The user prompt: "Class: MasterEngine... One stable central logic engine"
-                        # But `candles_1m` is just a deque, not `candles_1m[symbol]`.
-                        # This implies MasterEngine might be per-symbol or we need to clear it?
-                        # Or we update MasterEngine.candles_1h here?
-                        # MasterEngine.inject_external_candles("1h", list(q)) 
-                        if symbol == self.target_symbol:
-                             self.engine.inject_external_candles("1h", list(q))
+                        if symbol in self.processors:
+                             self.processors[symbol].engine.inject_external_candles("1h", list(q))
                 
                 if 'balance' in data:
                      asyncio.create_task(self.handle_balance(data['balance']))
@@ -505,267 +505,117 @@ class DerivConnector:
             "timestamp": datetime.fromtimestamp(epoch).isoformat(),
         }
         
-        # Broadcast ALL ticks for live feed (before symbol filtering)
+        # Broadcast ALL ticks
         await stream_manager.broadcast_tick(tick_data)
         
-        # Monitor positions for local SL/TP (for Options trading)
+        # Monitor positions
         await self.monitor_positions_for_sl_tp(float(bid), symbol)
         
-        # Only process ticks for target symbol
-        if symbol != self.target_symbol:
+        # Only process enabled symbols
+        if symbol not in self.enabled_symbols:
             return
-
-        self.tick_count += 1
-
-        if self.tick_count % 10 == 0:
-            market_mode = self.engine.detect_market_mode(list(self.engine.candles_1m))
-            msg = f"[PROCESS] Tick {self.tick_count} for {symbol} @ {bid} | Mode: {market_mode}"
-            logger.info(msg)
-            # Make visible to API
-            await stream_manager.broadcast_log({
-                "id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
-                "message": msg,
-                "level": "info",
-                "source": "DerivConnector"
-            })
             
-        # Throttled Strategy Trace (Every 60 ticks/approx 1 min)
-        if self.tick_count % 60 == 0:
-            indicator_data = self.indicator_layer.analyze({'quote': float(bid), 'epoch': epoch})
-            rsi = indicator_data.get('rsi', 0)
-            ma_trend = indicator_data.get('ma_trend', 'N/A')
-            market_mode = self.engine.detect_market_mode(list(self.engine.candles_1m))
-            msg = f"[STRATEGY TRACE] Analyzing {symbol} | RSI: {rsi:.1f} | Trend: {ma_trend} | Mode: {market_mode}"
-            logger.info(msg)
-            await stream_manager.broadcast_log({
-                "id": str(uuid.uuid4()),
-                "timestamp": datetime.now().isoformat(),
-                "message": msg,
-                "level": "info",
-                "source": "Strategy"
-            })
+        # Get Processor
+        if symbol not in self.processors:
+             self.processors[symbol] = SymbolProcessor(symbol, self.default_config)
+        
+        p = self.processors[symbol]
 
-        
-        skip_reason = None
-        current_regime = 'unknown'
-        current_volatility = 'unknown'
-        atr_val = 0.0
-        final_confidence = 0.0
-        
+        self.tick_count += 1 # Global tick count
+
         try:
-            # --- PHASE 1: MARKET INTELLIGENCE ---
             # 1. Update Engine
-            self.engine.update_tick(symbol, float(bid), epoch)
+            tick_for_algo = {
+                "symbol": symbol,
+                "quote": float(bid),
+                "high": float(tick.get('ask', bid)),
+                "low": float(tick.get('bid', bid)),
+                "open": float(bid),
+                "epoch": epoch
+            }
+            p.engine.update_tick(symbol, float(bid), epoch)
             
-            tick_for_algo = {'quote': float(bid), 'epoch': epoch}
+            # 2. Analyze Indicators
+            indicator_data = p.indicator_layer.analyze(tick_for_algo, engine=p.engine)
+            structure_data = p.market_structure.analyze(tick_for_algo)
             
-            # Get Unified Status
-            # We use 1m candles for primary mode detection as per typical scalping logic, 
-            # but MasterEngine uses all TFs internally for confidence.
-            candles_1m_list = list(self.engine.candles_1m)
-            market_mode = self.engine.detect_market_mode(candles_1m_list)
-            noise_detected = self.engine.detect_noise(candles_1m_list)
-            volatility_state = self.engine.get_volatility("1m")
+            # 3. Strategy Analysis
+            candles_1m_list = list(p.engine.candles_1m)
+            market_mode = p.engine.detect_market_mode(candles_1m_list)
             
-            current_regime = market_mode # Mapping for logging
-            current_volatility = volatility_state
-            
-            # ATR check for logging
-            atr_val = 0.0
-            if len(candles_1m_list) > 14:
-                 atr_val = self.engine._atr(
-                    np.array([c['high'] for c in candles_1m_list]),
-                    np.array([c['low'] for c in candles_1m_list]),
-                    np.array([c['close'] for c in candles_1m_list]), 14
-                )[-1]
-
-            # --- BROADCAST MARKET STATUS (Throttled) ---
-            if self.tick_count % 5 == 0:
-                strategy_info = self.strategy_manager.get_active_strategy_info()
-                await stream_manager.broadcast_event('market_status', {
-                    "regime": market_mode,
-                    "volatility": volatility_state,
-                    "active_strategy": strategy_info.get("name", "None"),
-                    "symbol": symbol
-                })
-
-            # 2. Filter Noise
-            if noise_detected:
-                skip_reason = f"MasterEngine: Noise/Spike Detected"
-                # block?
-                # We will continue but confidence will be impacted or strategy can decide
-
-            # 3. Analyze Market Structure & Indicators
-            structure_data = self.market_structure.analyze(tick_for_algo)
-            indicator_data = self.indicator_layer.analyze(tick_for_algo)
-            
-            # 4. Run Active Strategy
-            # Strategy now receives the ENGINE instance
-            strategy_signal = self.strategy_manager.run_strategy(
-                symbol, tick_for_algo, 
-                engine=self.engine, # PASSING ENGINE
-                structure_data=structure_data, 
-                indicator_data=indicator_data
+            # Run strategy
+            strategy_signal = p.strategy_manager.run_strategy(
+                symbol,
+                tick_for_algo,
+                p.engine,
+                structure_data,
+                indicator_data
             )
             
+            # 4. Final Validation & Execution
+            action = strategy_signal.get('action') if strategy_signal else None
+            final_confidence = strategy_signal.get('confidence', 0) if strategy_signal else 0
+            
+            if action:
+                # 1. Cooldown Check
+                if not self.cooldown_manager.can_trade():
+                    logger.warning(f"[SIGNAL SKIPPED] {symbol}: Cooldown Active")
+                    return
 
-            
-            # Detailed Signal Logic (For Visibility)
-            is_safe = False
-            action = None
-            
-            if strategy_signal:
-                strategy_action = strategy_signal['action']  # Strategy determines direction
-                strategy_confidence = strategy_signal.get('confidence', 0.5)
-                s_score = structure_data.get('score', 50)
-                i_score = indicator_data.get('score', 50)
-                
-                # Validate entry with structure and indicators (validator checks quality, not direction)
-                entry_signal = self.entry_validator.validate(
-                    structure_data, indicator_data, is_vol_valid
+                # 2. Risk Guard Check
+                start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
+                volatility_state = p.engine.get_volatility("1m")
+                is_safe, guard_msg = self.risk_guard.check_trade_allowed(
+                    self.current_account.get('balance', 0.0),
+                    start_bal,
+                    len(self.open_positions),
+                    volatility_state,
+                    self.is_authorized
                 )
                 
-                if not entry_signal:
-                    if not skip_reason: # Verify we haven't already skipped due to volatility
-                        skip_reason = f"EntryValidator Rejected: Structure={s_score}, Indicators={i_score} (Needs more alignment/strength)"
-                    action = None
-                else:
-                    validator_action = entry_signal['action']
-                    validator_confidence = entry_signal['confidence']
-                    
-                    # Use strategy's confidence (it knows the market better), but validate direction alignment
-                    # For direction-specific strategies (Boom300=SELL, Crash300=BUY), strategy takes precedence
-                    # For general strategies (V10), require alignment
-                    
-                    # Check if directions align (unless strategy is direction-specific)
-                    strategy_config = self.strategy_manager.current_strategy.config if self.strategy_manager.current_strategy else {}
-                    is_direction_specific = strategy_config.get('direction') in ['SELL_ONLY', 'BUY_ONLY']
-                    
-                    if is_direction_specific:
-                        # For direction-specific strategies, use strategy action and confidence
-                        action = strategy_action
-                        final_confidence = strategy_confidence
-                    else:
-                        if strategy_action != validator_action:
-                            skip_reason = f"Signal Conflict: Strategy={strategy_action} vs Validator={validator_action}"
-                            action = None
-                        else:
-                            action = strategy_action
-                        final_confidence = strategy_confidence # Use raw strategy confidence (e.g. 50 from test mode)
-                    
-                    logger.info(f"DEBUG TRACE 1: Action={action}, Conf={final_confidence}, StrategyConf={strategy_confidence}")
-                    if action:
-                        # Reasonable confidence thresholds for production
-                        if current_volatility == "extreme":
-                            threshold = 0.4  # Moderate threshold for extreme volatility
-                        elif current_volatility == "high":
-                            threshold = 0.3  # Lower threshold for high volatility
-                        else:
-                            threshold = 0.2  # Even lower for normal conditions
-                            
-                        if final_confidence < threshold:
-                            skip_reason = f"Low Confidence: {final_confidence:.2f} < {threshold} (Scores: S={s_score}, I={i_score})"
-                            action = None
-                        else:
-                            # --- PHASE 3: RISK MANAGEMENT ---
-                            # 6. Check Risk Guards (Daily Loss, etc.)
-                            start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
-                            is_safe, guard_msg = self.risk_guard.check_trade_allowed(
-                                self.current_account.get('balance', 0.0),
-                                start_bal,
-                                len(self.open_positions),
-                                current_volatility,
-                                self.is_authorized
-                            )
-                            
-                            if not is_safe:
-                                skip_reason = f"Risk Guard Blocked: {guard_msg}"
-                                action = None
-                            else:
-                                # 7. Check Cooldown
-                                if not self.cooldown_manager.can_trade():
-                                    skip_reason = "Cooldown Manager: Interval Active"
-                                    action = None
-            else:
-                if not skip_reason: skip_reason = "No Strategy Signal (RSI/Momentum not met)"
-
-            # Enhanced logging for all skipped signals - more visibility
-            if skip_reason:
-                # Log every skip with detailed information
-                logger.warning(f"[SIGNAL SKIPPED] Tick {self.tick_count}: {skip_reason}")
-                logger.info(f"[SIGNAL DETAILS] Symbol: {symbol}, ATR: {atr_val:.6f}, Confidence: {final_confidence:.2f}, Regime: {current_regime}")
-                
-                # Broadcast skipped signal to frontend for visibility
-                await stream_manager.broadcast_event('signal_skipped', {
-                    "tick_count": self.tick_count,
-                    "reason": skip_reason,
-                    "symbol": symbol,
-                    "atr": atr_val,
-                    "confidence": final_confidence,
-                    "regime": current_regime,
-                    "volatility": current_volatility,
-                    "timestamp": datetime.now().isoformat()
-                })
-                
-                # Also log to history for debugging -> REMOVED per user request to reduce noise
-                # await stream_manager.broadcast_log({
-                #     "id": str(uuid.uuid4()),
-                #     "timestamp": datetime.now().isoformat(),
-                #     "message": f"Skipped: {skip_reason} ({symbol})",
-                #     "level": "warning",
-                #     "source": "Strategy"
-                # })
-                
-                # Throttle return to avoid blocking, but log everything
-                if self.tick_count % 5 == 0:
-                    return
-                else:
+                if not is_safe:
+                    logger.warning(f"[SIGNAL SKIPPED] {symbol}: Risk Guard Blocked: {guard_msg}")
                     return
 
-
-            # --- PHASE 4: EXECUTION SETUP ---
-            # Guard: If no valid action (skipped signal), do not proceed
-            if not action:
-                 if not skip_reason:
-                     skip_reason = "No Valid Action Determined"
-                 # Skip execution for this tick
-                 return
-
-            # 8. Smart Exits
-            # Use SL/TP from strategy if available, otherwise fallback to MasterEngine logic
-            sl_price = strategy_signal.get('sl') if strategy_signal else None
-            tp_price = strategy_signal.get('tp') if strategy_signal else None
-            
-            if sl_price is None or tp_price is None:
-                # Fallback to generic calculation if strategy didn't provide it
-                momentum_factor = 1.0
-                if action == "BUY":
-                    momentum_factor = max(0.5, indicator_data.get('score', 50) / 50.0)
-                else: # SELL
-                    momentum_factor = max(0.5, (100 - indicator_data.get('score', 50)) / 50.0)
+                sl_price = strategy_signal.get('sl')
+                tp_price = strategy_signal.get('tp')
                 
-                if sl_price is None:
-                    sl_price = self.smart_sl.calculate_sl_price(float(bid), action, atr_val)
-                if tp_price is None:
-                    tp_price = self.dynamic_tp.calculate_tp_price(float(bid), sl_price, action, momentum_factor=momentum_factor)
-            
-            logger.info(f"[EXECUTION PREP] Action: {action}, SL: {sl_price}, TP: {tp_price}, Confidence: {final_confidence}")
-            
-            # 9. Weighted Lot Sizing
-            risk_pct = self.default_config.get('riskPercent', 0.5)
-            risk_amount = self.lot_calculator.calculate_lot_size(
-                self.current_account.get('balance', 0.0),
-                risk_pct,
-                final_confidence,
-                current_regime,
-                volatility=current_volatility,
-                symbol=symbol
-            )
-            
-            stake = max(0.35, risk_amount) # Min stake
+                # Convert distances to prices if needed
+                if sl_price is not None and sl_price < (float(bid) * 0.5):
+                     sl_price = float(bid) - sl_price if action == "BUY" else float(bid) + sl_price
+                if tp_price is not None and tp_price < (float(bid) * 0.5):
+                     tp_price = float(bid) + tp_price if action == "BUY" else float(bid) - tp_price
+                
+                # Weighted lot size
+                risk_pct = 0.5
+                stake = self.lot_calculator.calculate_lot_size(
+                    self.current_account.get('balance', 0.0),
+                    risk_pct,
+                    final_confidence,
+                    market_mode,
+                    volatility=volatility_state,
+                    symbol=symbol
+                )
+                
+                # Min stake check
+                stake = max(0.35, stake)
 
-            # --- PHASE 5: EXECUTION (C++ Engine Validation) ---
+                # Execution
+                await self.execute_order(symbol, action, stake, sl_price, tp_price, final_confidence, market_mode)
+                
+        except Exception as e:
+            logger.error(f"Error in handle_tick: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+    async def execute_order(self, symbol, action, stake, sl, tp, confidence, market_mode):
+        """Unified order execution with C++ safety check."""
+        try:
+            # Get processor for strategy info
+            p = self.processors.get(symbol)
+            strategy_info = p.strategy_manager.get_active_strategy_info() if p else {"name": "V10_V75_Scalper"}
+            
+            # 1. C++ Engine Validation
             trade_params = {
                 "symbol": symbol,
                 "action": action,
@@ -773,38 +623,34 @@ class DerivConnector:
                 "active_trades": len(self.open_positions)
             }
             
-            # Verify with C++ Engine (Safety Layer)
             execution_result_json = EngineWrapper.execute_trade(json.dumps(trade_params))
             result = json.loads(execution_result_json)
             
-            logger.info(f"DEBUG: C++ Engine Says: {result}")
-            if result.get("status") == "approved":
-                # Execute Real Trade
-                strategy_info = self.strategy_manager.get_active_strategy_info()
-                metadata = {
-                    "strategy": strategy_info.get("name", "Unknown"),
-                    "regime": current_regime,
-                    "confidence": final_confidence,
-                    "stop_loss": sl_price,
-                    "take_profit": tp_price
-                }
-                
-                await self.execute_buy(
-                    symbol=symbol,
-                    contract_type="CALL" if action == "BUY" else "PUT",
-                    amount=stake,
-                    metadata=metadata
-                )
-                
-                # Record cooldown
-                self.cooldown_manager.record_trade()
-            else:
-                logger.warning(f"C++ Engine Rejected: {result.get('reason')}")
+            if result.get("status") != "approved":
+                logger.warning(f"C++ Engine Blocked {symbol} {action}: {result.get('reason')}")
+                return
+
+            # 2. Metadata for tracking
+            metadata = {
+                "strategy": strategy_info.get("name", "V10_V75_Scalper"),
+                "regime": market_mode,
+                "confidence": confidence,
+                "stop_loss": sl,
+                "take_profit": tp
+            }
             
+            # 3. Placement
+            await self.execute_buy(
+                symbol=symbol,
+                contract_type="CALL" if action == "BUY" else "PUT",
+                amount=stake,
+                metadata=metadata
+            )
+            
+            # Record cooldown after successful execution
+            self.cooldown_manager.record_trade()
         except Exception as e:
-            logger.error(f"Error in handle_tick: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+            logger.error(f"Error in execute_order for {symbol}: {e}")
 
     async def execute_buy(self, symbol: str, contract_type: str, amount: float, duration: int = 5, duration_unit: str = 't', metadata: dict = None):
         """
@@ -1155,10 +1001,17 @@ class DerivConnector:
                     direction = metadata.get('action') # "BUY" or "SELL"
                     
                     if current_sl is not None and direction:
-                        # Check Trailing Update
-                        new_sl = self.dynamic_tp.check_trailing_update(
-                            current_price, entry_price, current_sl, direction
-                        )
+                        # Get processor for symbol
+                        sym = contract.get('underlying')
+                        p = self.processors.get(sym)
+                        
+                        if p and hasattr(p, 'dynamic_tp'):
+                            # Check Trailing Update
+                            new_sl = p.dynamic_tp.check_trailing_update(
+                                current_price, entry_price, current_sl, direction
+                            )
+                        else:
+                            new_sl = None
                         if new_sl:
                             logger.info(f"Trailing SL Update for {cid}: {current_sl} -> {new_sl}")
                             metadata['stop_loss'] = new_sl
@@ -1271,31 +1124,38 @@ class DerivConnector:
             pass
 
     async def switch_symbol(self, new_symbol: str):
-        if new_symbol == self.target_symbol:
-            return
-            
-        logger.info(f"Switching target symbol from {self.target_symbol} to {new_symbol}")
-        
-        # Map user-friendly symbols to API format
+        """Dynamic symbol switching - adds to enabled list and primes history."""
+        # Normalize symbol
         api_symbol = new_symbol
         if new_symbol in ["BOOM300", "BOOM_300"]: api_symbol = "BOOM300N"
         elif new_symbol in ["CRASH300", "CRASH_300", "CRASH300S"]: api_symbol = "CRASH300N"
-        elif new_symbol == "R100": api_symbol = "R_100"
-        elif new_symbol == "R75": api_symbol = "R_75"
-        elif new_symbol == "R50": api_symbol = "R_50"
-        elif new_symbol == "R25": api_symbol = "R_25"
-        elif new_symbol == "R10": api_symbol = "R_10"
+        elif new_symbol.startswith("R") and "_" not in new_symbol:
+            api_symbol = "R_" + new_symbol[1:]
+            
+        logger.info(f"Targeting new symbol: {api_symbol}")
         
+        # Add to enabled if not there
+        if api_symbol not in self.enabled_symbols:
+            self.enabled_symbols.append(api_symbol)
+            # Re-subscribe to all (to include new one)
+            await self.subscribe_ticks()
+            # Prime history
+            await self.warm_up_history()
+            
+        # Reset engine for clean start on this symbol
+        if api_symbol in self.processors:
+            self.processors[api_symbol].engine.reset()
+            
         # Broadcast log
         await stream_manager.broadcast_log({
             "id": str(uuid.uuid4()),
             "timestamp": datetime.now().isoformat(),
-            "message": f"Trading symbol switched to: {api_symbol} ({new_symbol})",
+            "message": f"Trading symbol switched/added: {api_symbol}",
             "level": "info",
             "source": "System"
         })
         
-        self.target_symbol = api_symbol
+        # self.target_symbol = api_symbol # Retired in multi-symbol refactor
         
         # Subscriptions
         if new_symbol not in self.active_symbols:

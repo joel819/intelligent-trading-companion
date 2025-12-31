@@ -35,7 +35,7 @@ def get_status():
         "tradesExecuted": deriv_client.session_stats["trades"],
         "profitToday": deriv_client.session_stats["pnl"],
         "account": deriv_client.active_account_id,
-        "symbol": deriv_client.target_symbol
+        "symbols": deriv_client.enabled_symbols
     }
 
 @router.post("/toggle/")

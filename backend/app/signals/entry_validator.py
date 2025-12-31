@@ -40,8 +40,8 @@ class EntryValidator:
         # Previously: Both scores should be on the same side of 50 and beyond 40/60
         # Now: Allow if average is strong or if one is extremely strong
         
-        is_bullish = (struct_score > 55 and ind_score > 55) or (struct_score > 75) or (ind_score > 75)
-        is_bearish = (struct_score < 45 and ind_score < 45) or (struct_score < 25) or (ind_score < 25)
+        is_bullish = (struct_score > 45 and ind_score > 52) or (ind_score > 60)
+        is_bearish = (struct_score < 55 and ind_score < 48) or (ind_score < 40)
         
         # Guard against contradictory signals
         if (struct_score > 60 and ind_score < 40) or (struct_score < 40 and ind_score > 60):

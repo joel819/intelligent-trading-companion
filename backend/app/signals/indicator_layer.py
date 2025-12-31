@@ -32,7 +32,7 @@ class IndicatorLayer:
         self.v10_rsi_sell_min = 38
         self.v10_rsi_sell_max = 55
         
-    def analyze(self, tick_data: Dict) -> Dict:
+    def analyze(self, tick_data: Dict, **kwargs) -> Dict:
         """
         Analyze indicators.
         
@@ -47,15 +47,17 @@ class IndicatorLayer:
         self.highs.append(high)
         self.lows.append(low)
         
-        if len(self.prices) < 50:
+        engine = kwargs.get('engine') # Optional MasterEngine
+        
+        if len(self.prices) < 50 and not engine:
              return {"score": 50, "rsi": 50, "bias": "neutral", "ma_trend": "neutral", "ma_slope": 0, "adx": 0}
              
-        rsi = self._calculate_rsi()
+        rsi = self._calculate_rsi(engine=engine, current_price=price)
         # Update RSI Hybrid Mode history
         self.rsi_history.append(rsi)
         
         macd_val, signal_val, hist_val = self._calculate_macd()
-        ma_trend, ma_slope = self._check_ma_trend()
+        ma_trend, ma_slope = self._check_ma_trend(engine=engine, current_price=price)
         adx = self._calculate_adx()
         
         score = 50
@@ -148,7 +150,32 @@ class IndicatorLayer:
         if rsi_overbought is not None: self.rsi_overbought = rsi_overbought
         logger.info("IndicatorLayer parameters updated.")
 
-    def _calculate_rsi(self) -> float:
+    def _calculate_rsi(self, engine=None, current_price=None) -> float:
+        """
+        Calculate RSI. If engine is provided, uses 1-minute candles.
+        Otherwise falls back to tick-based calculation.
+        """
+        # --- CASE 1: Engine Provided (Use 1m Candles) ---
+        if engine and hasattr(engine, 'candles_1m') and len(engine.candles_1m) >= self.rsi_period:
+            candles = list(engine.candles_1m)
+            # Use 'close' of last 14 candles + current price
+            closes = [c['close'] for c in candles[-self.rsi_period:]]
+            if current_price is not None:
+                closes.append(current_price)
+            
+            closes_arr = np.array(closes)
+            deltas = np.diff(closes_arr)
+            
+            gains = deltas[deltas > 0]
+            losses = -deltas[deltas < 0]
+            
+            avg_gain = np.mean(gains) if len(gains) > 0 else 0
+            avg_loss = np.mean(losses) if len(losses) > 0 else 1e-10
+            
+            rs = avg_gain / avg_loss
+            return 100.0 - (100.0 / (1.0 + rs))
+
+        # --- CASE 2: Fallback to Tick-based RSI ---
         if len(self.prices) <= self.rsi_period:
             return 50.0
         
@@ -273,13 +300,12 @@ class IndicatorLayer:
         
         current_rsi = self.rsi_history[-1] if len(self.rsi_history) > 0 else 50.0
         
-        # Decision Logic:
-        # BUY: flow is bullish AND momentum_up is true
-        # SELL: flow is bearish AND momentum_down is true
-        # If volatility_state = "flat", reduce confidence but DON'T completely block
+        # BUY: flow is bullish (Current RSI > 50)
+        # SELL: flow is bearish (Current RSI < 50)
+        # Relaxed: Removed strict momentum_up/down requirement for scalping
         
-        allow_buy = (flow == "bullish" and slope["momentum_up"])
-        allow_sell = (flow == "bearish" and slope["momentum_down"])
+        allow_buy = (flow == "bullish")
+        allow_sell = (flow == "bearish")
         
         # Flat volatility: Instead of blocking, we just reduce confidence
         # This allows trades in slow-moving markets while still penalizing them
@@ -335,13 +361,39 @@ class IndicatorLayer:
         
         return macd_line, signal_line, histogram
         
-    def _check_ma_trend(self) -> tuple[str, float]:
+    def _check_ma_trend(self, engine=None, current_price=None) -> tuple[str, float]:
         """
         Check MA trend and calculate slope.
-        
-        Returns:
-            Tuple of (trend_direction, ma_slope)
+        If engine is provided, uses 1-minute candles.
         """
+        # --- CASE 1: Engine Provided (Use 1m Candles) ---
+        if engine and hasattr(engine, 'candles_1m') and len(engine.candles_1m) >= 50:
+            candles = list(engine.candles_1m)
+            closes = [c['close'] for c in candles]
+            if current_price is not None:
+                closes.append(current_price)
+            
+            closes_arr = np.array(closes)
+            
+            # Use standard EMA periods (14 and 40 as per V10 config)
+            ma20 = np.mean(closes_arr[-20:])
+            ma50 = np.mean(closes_arr[-50:])
+            
+            # Slope of MA20 over last few candles
+            ma20_prev = np.mean(closes_arr[-25:-5])
+            ma_slope = (ma20 - ma20_prev) / ma20_prev if ma20_prev != 0 else 0.0
+            
+            price = closes_arr[-1]
+            if price > ma20 and ma20 > ma50:
+                trend = "bullish"
+            elif price < ma20 and ma20 < ma50:
+                trend = "bearish"
+            else:
+                trend = "neutral"
+                
+            return trend, ma_slope
+
+        # --- CASE 2: Fallback to Tick-based MA ---
         if len(self.prices) < 20:
             return "neutral", 0.0
             

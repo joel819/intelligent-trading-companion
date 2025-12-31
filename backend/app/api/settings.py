@@ -45,7 +45,7 @@ def get_settings():
         "takeProfitPoints": config.get("take_profit_points", 100),
         "maxOpenTrades": config.get("max_open_trades", 5),
         "drawdownLimit": config.get("drawdown_limit", 10),
-        "symbol": deriv_client.target_symbol,
+        "symbol": deriv_client.enabled_symbols[0] if deriv_client.enabled_symbols else "R_100",
         # Advanced Settings
         "minATR": config.get("min_atr", 0.0003),
         "maxATR": config.get("max_atr", 0.01),
@@ -83,11 +83,11 @@ async def switch_symbol(req: SymbolSwitchRequest):
         if not req.symbol:
             return {"status": "error", "message": "symbol is required"}
 
-        if req.symbol == deriv_client.target_symbol:
-            return {"status": "success", "symbol": deriv_client.target_symbol}
-
+        if req.symbol in deriv_client.enabled_symbols:
+            return {"status": "success", "symbol": req.symbol}
+            
         await deriv_client.switch_symbol(req.symbol)
-        return {"status": "success", "symbol": deriv_client.target_symbol}
+        return {"status": "success", "symbol": req.symbol}
     except Exception as e:
         logger.error(f"Failed to switch symbol: {e}")
         return {"status": "error", "message": str(e)}
@@ -125,7 +125,7 @@ async def update_settings(settings: StrategySettings):
         logger.info(f"Settings Updated in DerivClient: {deriv_client.default_config}")
         
         # Handle symbol switch
-        if settings.symbol != deriv_client.target_symbol:
+        if settings.symbol not in deriv_client.enabled_symbols:
             asyncio.create_task(deriv_client.switch_symbol(settings.symbol))
 
         # Push to C++ Engine (if it supports these fields)

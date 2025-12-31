@@ -27,12 +27,13 @@ async def select_account(account_id: str):
     deriv_client.active_account_id = account_id
     
     # Trigger re-authorization if we have a token for this account
-    # Note: Tokens are often provided in the authorize response or can be switched manually
-    if target_acc.get("token"):
-        await deriv_client.authorize(target_acc["token"])
+    # We check both the account object and our internal token map
+    token = target_acc.get("token") or deriv_client.account_tokens.get(account_id)
+    
+    if token:
+        await deriv_client.authorize(token)
     else:
         # If no token, we still mark it active internally for balance state
-        # In a real app, the user would need to provide the token for each account
         for acc in deriv_client.available_accounts:
             acc['isActive'] = (acc['id'] == account_id)
             if acc['isActive']:

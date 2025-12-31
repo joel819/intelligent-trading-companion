@@ -51,6 +51,7 @@ class RiskGuard:
         max_loss = start_balance * (self.max_daily_loss_pct / 100.0)
         
         if current_loss >= max_loss:
+            logger.warning(f"RiskGuard: StartBal={start_balance}, CurrentBal={account_balance}, Loss={current_loss}, MaxAllowed={max_loss} (Pct={self.max_daily_loss_pct}%)")
             return False, f"Daily loss limit hit (-${current_loss:.2f})"
         
         # 3. Max Stop Losses

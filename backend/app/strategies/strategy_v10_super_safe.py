@@ -40,16 +40,20 @@ class V10SuperSafeStrategy(BaseStrategy):
             "use_ma_trend": True,
             "ma_fast": 14,
             "ma_slow": 40,
-            "min_ma_slope": 0.01,  # Catch early trends
+            # Trend Filter
+            "use_ma_trend": True,
+            "ma_fast": 14,
+            "ma_slow": 40,
+            "min_ma_slope": 0.001,  # Even faster
             "adx_threshold": 10,
-            "sideways_slope_threshold": 0.005,
+            "sideways_slope_threshold": 0.0, # NO SIDEWAYS FILTER
             
             # Entry Logic
             "rsi_period": 14,
-            "rsi_buy_min": 48,
-            "rsi_buy_max": 62,
-            "rsi_sell_min": 38,
-            "rsi_sell_max": 55,
+            "rsi_buy_min": 45,  # Broadened from 48
+            "rsi_buy_max": 70,  # Broadened from 62
+            "rsi_sell_min": 30, # Broadened from 38
+            "rsi_sell_max": 55, # Keep for safety
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
             
@@ -129,7 +133,7 @@ class V10SuperSafeStrategy(BaseStrategy):
         
         # === FILTER 2: Trend Validation (ENABLED) ===
         if abs(ma_slope) < self.config["sideways_slope_threshold"]:
-            logger.info(f"[V10] Trade rejected: Sideways market (MA slope: {ma_slope:.5f})")
+            logger.info(f"[V10] Trade rejected: Sideways market (Slope: {ma_slope:.6f}, RSI: {rsi:.1f})")
             return None
             
         # if adx < self.config["adx_threshold"]:
@@ -149,9 +153,11 @@ class V10SuperSafeStrategy(BaseStrategy):
         if ma_trend == "bullish" or (ma_trend == "neutral" and rsi > 50):
             
             # --- MTF FILTER (1-Hour Alignment) ---
+            # Soften: Instead of hard reject, give it a confidence penalty
+            mtf_penalty = 0
             if mtf_trend == "bearish":
-                logger.info(f"[V10] BUY rejected: H1 Trend is Bearish")
-                return None
+                mtf_penalty = -15
+                logger.info(f"[V10] BUY Warning: H1 Trend is Bearish (-15% Penalty)")
             
             # --- RSI HYBRID MODE FILTER ---
             # Access the IndicatorLayer from DerivConnector (passed via engine or indicator_data)
@@ -175,9 +181,11 @@ class V10SuperSafeStrategy(BaseStrategy):
             }
             smart_confidence = engine.calculate_confidence(conf_data)
             
-            # Apply RSI Hybrid Mode confidence modifier
+            # Apply RSI Hybrid Mode and MTF confidence modifiers
             if rsi_hybrid:
                 smart_confidence += rsi_hybrid.get("confidence_modifier", 0) * 100
+            
+            smart_confidence += mtf_penalty
             
             if smart_confidence < 5:
                pass
@@ -225,9 +233,10 @@ class V10SuperSafeStrategy(BaseStrategy):
         if ma_trend == "bearish" or (ma_trend == "neutral" and rsi < 50): 
             
             # --- MTF FILTER (1-Hour Alignment) ---
+            mtf_penalty = 0
             if mtf_trend == "bullish":
-                logger.info(f"[V10] SELL rejected: H1 Trend is Bullish")
-                return None
+                mtf_penalty = -15
+                logger.info(f"[V10] SELL Warning: H1 Trend is Bullish (-15% Penalty)")
             
             # --- RSI HYBRID MODE FILTER ---
             rsi_hybrid = None
@@ -249,9 +258,11 @@ class V10SuperSafeStrategy(BaseStrategy):
             }
             smart_confidence = engine.calculate_confidence(conf_data)
             
-            # Apply RSI Hybrid Mode confidence modifier
+            # Apply RSI Hybrid Mode and MTF confidence modifiers
             if rsi_hybrid:
                 smart_confidence += rsi_hybrid.get("confidence_modifier", 0) * 100
+            
+            smart_confidence += mtf_penalty
             
             if smart_confidence < 50:
                 pass

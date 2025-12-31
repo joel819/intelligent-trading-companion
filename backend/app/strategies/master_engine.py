@@ -348,10 +348,10 @@ class MasterEngine:
         wick_total = (c['high'] - max(c['close'], c['open'])) + (min(c['close'], c['open']) - c['low'])
         
         # 1. Wick-to-body ratio > 3x
-        if (wick_total / body) > 3.0:
+        if (wick_total / body) > 10.0: # Relaxed for scalping (was 3.0)
             return True
             
-        # 2. ATR Spike > 2.5x average (Adjusted by Multiplier)
+        # 2. ATR Spike > 3.5x average (Adjusted by Multiplier)
         highs = np.array([x['high'] for x in candles])
         lows = np.array([x['low'] for x in candles])
         closes = np.array([x['close'] for x in candles])
@@ -361,9 +361,9 @@ class MasterEngine:
         sensitivity = self.current_profile.get("noise_sensitivity", "medium")
         
         # Adjust threshold based on sensitivity
-        threshold = 2.5
-        if sensitivity == "low": threshold = 3.5
-        elif sensitivity == "high": threshold = 2.0
+        threshold = 3.5 # Relaxed from 2.5
+        if sensitivity == "low": threshold = 5.0 # Relaxed from 3.5
+        elif sensitivity == "high": threshold = 2.5 # Relaxed from 2.0
             
         # Apply profile multiplier to normalized checking
         if atr[-1] > (np.mean(atr) * threshold * atr_mult):
@@ -430,10 +430,12 @@ class MasterEngine:
         sep = abs(ema20[-1] - ema50[-1])
         avg_p = np.mean(closes)
         
-        if sep > (avg_p * 0.0005):
+        trend_thresh = self.current_profile.get("trend_threshold", 0.0005)
+        
+        if sep > (avg_p * trend_thresh):
             # Strong trend check (steep slope)
             slope_5 = abs(ema20[-1] - ema20[-5])
-            if slope_5 > (avg_p * 0.001):
+            if slope_5 > (avg_p * trend_thresh * 2):
                 return "strong_trend"
             return "trend"
             

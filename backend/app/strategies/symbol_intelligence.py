@@ -38,6 +38,7 @@ class SymbolIntelligence:
                 "market_type": "forex",
                 "atr_multiplier": 1.0,
                 "noise_sensitivity": "medium",
+                "trend_threshold": 0.0005, # 0.05% separation
                 "trend_weight": {"1m": 0.10, "5m": 0.20, "15m": 0.30, "1h": 0.40},
                 "spike_protection": False
             }
@@ -47,6 +48,7 @@ class SymbolIntelligence:
                 "market_type": "boomcrash",
                 "atr_multiplier": 0.6,
                 "noise_sensitivity": "low",
+                "trend_threshold": 0.0003, # More sensitive for Boom/Crash
                 "trend_weight": {"1m": 0.10, "5m": 0.20, "15m": 0.25, "1h": 0.45},
                 "spike_protection": True
             }
@@ -54,8 +56,9 @@ class SymbolIntelligence:
         elif market_type == "volatility":
             return {
                 "market_type": "volatility",
-                "atr_multiplier": 1.8,
+                "atr_multiplier": 5.0, # Much less sensitive to noise (was 1.8)
                 "noise_sensitivity": "low",
+                "trend_threshold": 0.0002, # Highly sensitive for R_10 etc.
                 "spike_protection": False,
                 "trend_weight": {"1m": 0.15, "5m": 0.25, "15m": 0.25, "1h": 0.35}
             }

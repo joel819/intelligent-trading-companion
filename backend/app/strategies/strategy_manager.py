@@ -143,10 +143,9 @@ class StrategyManager:
                     v2_confidence = engine.calculate_confidence(conf_data)
                     logger.info(f"DEBUG: MasterEngine Generic Confidence: {v2_confidence}")
                 
-                # Confidence Cutoff (User Rule: < 45 reject)
-                # But V10 strategy forces 50+ if valid, so this should pass.
-                if v2_confidence < 45: 
-                    logger.warning(f"DEBUG: Signal BLOCKED by Confidence! {v2_confidence} < 45")
+                # Confidence Cutoff (Relaxed for Scalping)
+                if v2_confidence < 15: 
+                    logger.warning(f"DEBUG: Signal BLOCKED by Confidence! {v2_confidence} < 15")
                     return None
 
                 # Update/Enrich Signal
