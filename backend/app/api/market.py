@@ -11,3 +11,8 @@ async def get_symbols():
 @router.get("/positions/")
 async def get_positions():
     return deriv_client.open_positions
+
+@router.get("/candles/{symbol}")
+async def get_candles(symbol: str, granularity: int = 60, count: int = 100):
+    candles = await deriv_client.get_candles(symbol, granularity, count)
+    return candles

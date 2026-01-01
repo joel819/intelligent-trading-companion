@@ -388,6 +388,30 @@ class DerivConnector:
             return symbols
         return []
 
+    async def get_candles(self, symbol: str, granularity: int = 60, count: int = 100):
+        """Fetches historical candles for a symbol."""
+        req = {
+            "ticks_history": symbol,
+            "style": "candles",
+            "granularity": granularity,
+            "count": count,
+            "end": "latest"
+        }
+        resp = await self.send_request(req)
+        if 'candles' in resp:
+            return [
+                {
+                    "time": datetime.fromtimestamp(c['epoch']).strftime('%H:%M'),
+                    "open": float(c['open']),
+                    "high": float(c['high']),
+                    "low": float(c['low']),
+                    "close": float(c['close']),
+                    "volume": 0 # Deriv doesn't always provide volume for all indices
+                }
+                for c in resp['candles']
+            ]
+        return []
+
     async def send_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         if not self.ws or not self.is_connected:
             raise ConnectionError("WebSocket not connected")
@@ -565,6 +589,16 @@ class DerivConnector:
                 # 1. Cooldown Check
                 if not self.cooldown_manager.can_trade():
                     logger.warning(f"[SIGNAL SKIPPED] {symbol}: Cooldown Active")
+                    await stream_manager.broadcast_skipped_signal({
+                        "tick_count": self.tick_count,
+                        "reason": "Cooldown Active",
+                        "symbol": symbol,
+                        "atr": 0, # Not relevant for cooldown
+                        "confidence": final_confidence,
+                        "regime": market_mode,
+                        "volatility": volatility_state,
+                        "timestamp": datetime.now().isoformat()
+                    })
                     return
 
                 # 2. Risk Guard Check
@@ -579,6 +613,16 @@ class DerivConnector:
                 
                 if not is_safe:
                     logger.warning(f"[SIGNAL SKIPPED] {symbol}: Risk Guard Blocked: {guard_msg}")
+                    await stream_manager.broadcast_skipped_signal({
+                        "tick_count": self.tick_count,
+                        "reason": f"Risk Guard: {guard_msg}",
+                        "symbol": symbol,
+                        "atr": p.engine.get_volatility("1m"), # Simple proxy
+                        "confidence": final_confidence,
+                        "regime": market_mode,
+                        "volatility": volatility_state,
+                        "timestamp": datetime.now().isoformat()
+                    })
                     return
 
                 sl_price = strategy_signal.get('sl')
@@ -791,6 +835,15 @@ class DerivConnector:
                 buy_resp = await self.send_request(buy_req)
                 
                 logger.info(f"RAW BUY RESPONSE from Deriv: {buy_resp}")
+                
+                # Broadcast trade execution for UI markers
+                await stream_manager.broadcast_event('trade_execution', {
+                    "symbol": symbol,
+                    "contract_type": effective_contract_type,
+                    "buy_price": float(buy_resp.get('buy', {}).get('buy_price', 0)),
+                    "timestamp": datetime.now().isoformat(),
+                    "id": buy_resp.get('buy', {}).get('contract_id')
+                })
                 
                 # Log to Audit
                 audit_logger.log_trade(

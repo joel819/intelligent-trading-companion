@@ -81,6 +81,10 @@ class StreamManager:
     async def broadcast_event(self, event_type: str, data: dict):
         await self._broadcast({"type": event_type, "data": data})
 
+    async def broadcast_skipped_signal(self, data: dict):
+        """Broadcast a skipped signal event."""
+        await self._broadcast({"type": "signal_skipped", "data": data})
+
     async def broadcast_notification(self, title: str, body: str, level: str = "info"):
         """Broadcast a system notification to the frontend."""
         await self._broadcast({
