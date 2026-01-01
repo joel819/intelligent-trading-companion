@@ -53,12 +53,15 @@ export const useMockData = () => {
   const [ticks, setTicks] = useState<Tick[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [botStatus, setBotStatus] = useState<BotStatus>({
+    isConnected: true,
     isRunning: true,
+    isAuthorized: true,
     strategy: 'ML Scalping + Grid',
     lastTrade: '2 minutes ago',
     uptime: 14520,
     tradesExecuted: 47,
     profitToday: 285.50,
+    symbol: 'VOLATILITY 75',
   });
   const [notifications, setNotifications] = useState<Notification[]>([
     { id: '1', type: 'trade', title: 'Trade Executed', message: 'BUY 0.5 lots EUR/USD @ 1.0825', timestamp: new Date().toISOString(), read: false },
