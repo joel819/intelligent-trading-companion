@@ -24,7 +24,12 @@ export const PositionsTable = ({ positions }: PositionsTableProps) => {
   const handleClose = async (id: string) => {
     setClosingIds(prev => new Set(prev).add(id));
     try {
-      await closePosition(id);
+      const result = await closePosition(id);
+      if (result && result.status === 'error') {
+        alert(result.message || 'Failed to close position');
+      }
+    } catch (error: any) {
+      alert(error.message || 'An unexpected error occurred while closing the position');
     } finally {
       // The table will re-render when the position is removed from state via WebSocket
       // But we keep the loading state for a bit to be safe or until removed
@@ -34,7 +39,7 @@ export const PositionsTable = ({ positions }: PositionsTableProps) => {
           next.delete(id);
           return next;
         });
-      }, 2000);
+      }, 1000);
     }
   };
 

@@ -14,6 +14,8 @@ from app.signals.indicator_layer import IndicatorLayer
 from app.signals.entry_validator import EntryValidator
 from app.exits.smart_stops import SmartStopLoss
 from app.exits.dynamic_tp import DynamicTakeProfit
+from app.exits.scalper_exit import ScalperExitModule
+from app.exits.scalper_tpsl import ScalperTPSL
 from app.risk.weighted_lots import WeightedLotCalculator
 from app.risk.risk_guard import RiskGuard
 from app.risk.cooldown_manager import CooldownManager
@@ -44,6 +46,8 @@ class SymbolProcessor:
         # Exits
         self.smart_sl = SmartStopLoss()
         self.dynamic_tp = DynamicTakeProfit()
+        self.scalper_exit = ScalperExitModule()
+        self.scalper_tpsl = ScalperTPSL()
 
 # Deriv API Endpoint
 DERIV_WS_BASE_URL = "wss://ws.derivws.com/websockets/v3"
@@ -56,9 +60,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DerivConnector:
-    def __init__(self, token: str = None, app_id: str = "118420"):
+    def __init__(self, token: str = None, app_id: str = "65395"):
         self.token = token or os.getenv("DERIV_TOKEN")
-        self.app_id = app_id or os.getenv("DERIV_APP_ID", "118420")
+        self.app_id = app_id or os.getenv("DERIV_APP_ID", "65395")
         if not self.token:
             logger.warning("No DERIV_TOKEN found in environment. Connection may fail.")
         self.ws = None
@@ -555,6 +559,7 @@ class DerivConnector:
             # 4. Final Validation & Execution
             action = strategy_signal.get('action') if strategy_signal else None
             final_confidence = strategy_signal.get('confidence', 0) if strategy_signal else 0
+            volatility_state = p.engine.get_volatility("1m")
             
             if action:
                 # 1. Cooldown Check
@@ -564,7 +569,6 @@ class DerivConnector:
 
                 # 2. Risk Guard Check
                 start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
-                volatility_state = p.engine.get_volatility("1m")
                 is_safe, guard_msg = self.risk_guard.check_trade_allowed(
                     self.current_account.get('balance', 0.0),
                     start_bal,
@@ -603,6 +607,26 @@ class DerivConnector:
                 # Execution
                 await self.execute_order(symbol, action, stake, sl_price, tp_price, final_confidence, market_mode)
                 
+            # 5. Broadcast Market Status (Always, even if no action)
+            strategy_info = p.strategy_manager.get_active_strategy_info()
+            await stream_manager.broadcast_event('market_status', {
+                "symbol": symbol,
+                "regime": market_mode,
+                "volatility": volatility_state,
+                "active_strategy": strategy_info.get("name", "Unknown")
+            })
+
+            # 6. Check for Scalper Exits
+            rsi_hybrid = p.indicator_layer.get_multi_rsi_confirmation()
+            await self.monitor_positions_for_sl_tp(
+                float(bid), 
+                symbol, 
+                momentum_up=rsi_hybrid.get("momentum_up"),
+                momentum_down=rsi_hybrid.get("momentum_down"),
+                slope_value=rsi_hybrid.get("slope_value", 0.0), # Added slope
+                volatility_state=volatility_state
+            )
+                
         except Exception as e:
             logger.error(f"Error in handle_tick: {e}")
             import traceback
@@ -640,15 +664,32 @@ class DerivConnector:
             }
             
             # 3. Placement
-            await self.execute_buy(
+            contract_type = "CALL" if action == "BUY" else "PUT"
+            buy_resp = await self.execute_buy(
                 symbol=symbol,
-                contract_type="CALL" if action == "BUY" else "PUT",
+                contract_type=contract_type,
                 amount=stake,
                 metadata=metadata
             )
             
             # Record cooldown after successful execution
             self.cooldown_manager.record_trade()
+            
+            # Activate Scalper Exit Monitoring for this symbol
+            if symbol in self.processors:
+                p = self.processors[symbol]
+                volatility_state = p.engine.get_volatility("1m")
+                p.scalper_exit.activate(
+                    trade_direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
+                    initial_volatility_state=volatility_state
+                )
+                # Initialize Scalper TPSL for breakeven tracking
+                p.scalper_tpsl.get_scalper_tp_sl(
+                    candles=list(p.engine.candles_1m),
+                    symbol=symbol,
+                    direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
+                    entry_price=float(buy_resp.get('buy', {}).get('buy_price', 0)) if buy_resp else 0.0
+                )
         except Exception as e:
             logger.error(f"Error in execute_order for {symbol}: {e}")
 
@@ -833,12 +874,17 @@ class DerivConnector:
             logger.error(f"Execution Error: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def monitor_positions_for_sl_tp(self, current_price: float, symbol: str):
+    async def monitor_positions_for_sl_tp(self, current_price: float, symbol: str, 
+                                          momentum_up: bool = None, momentum_down: bool = None, 
+                                          slope_value: float = 0.0, volatility_state: str = None):
         """
         Monitor open positions and close them if local SL/TP thresholds are hit.
-        This is used for Options (CALL/PUT) which don't support native limit_order.
+        This also handles Scalper Exits and Breakeven triggers.
         """
         closed_contracts = []
+        
+        # Get Processor for scalper status
+        p = self.processors.get(symbol)
         
         for contract_id, meta in list(self.contract_metadata.items()):
             if meta.get('symbol') != symbol:
@@ -875,7 +921,34 @@ class DerivConnector:
             
             if should_close:
                 logger.info(f"[LOCAL SL/TP] {close_reason} for Contract {contract_id}")
+        
+            # --- SCALPER EXTRA EXITS ---
+            if not should_close and p:
+                # 1. Check for Scalper Exit (RSI Flip, Micro Reversal, etc.)
+                candles = list(p.engine.candles_1m)
+                current_candle = candles[-1] if candles else None
                 
+                exit_decision = p.scalper_exit.get_scalper_exit_decision(
+                    momentum_up=momentum_up,
+                    momentum_down=momentum_down,
+                    slope_value=slope_value,
+                    candle=current_candle,
+                    volatility_state=volatility_state
+                )
+                
+                if exit_decision["exit_now"]:
+                    should_close = True
+                    close_reason = f"Scalper Exit Triggered: {', '.join(exit_decision['triggers'])}"
+                    logger.info(f"[SCALPER EXIT] {close_reason}")
+                
+                # 2. Check for Breakeven Move
+                else:
+                    be_check = p.scalper_tpsl.check_breakeven(current_price)
+                    if be_check["should_move_sl"]:
+                        meta['stop_loss'] = be_check["new_sl_price"]
+                        logger.info(f"[SCALPER BREAKEVEN] Moved SL to {meta['stop_loss']} for {symbol}")
+            
+            if should_close:
                 # Close the position via Deriv API
                 try:
                     close_req = {"sell": int(contract_id), "price": 0}
@@ -885,6 +958,9 @@ class DerivConnector:
                         logger.error(f"Failed to close contract {contract_id}: {close_resp['error']}")
                     else:
                         logger.info(f"Successfully closed contract {contract_id}")
+                        # Deactivate scalper monitoring for this symbol if all trades closed
+                        if p: p.scalper_exit.deactivate()
+                        
                         await stream_manager.broadcast_notification(
                             "Position Closed",
                             close_reason,
@@ -1084,8 +1160,12 @@ class DerivConnector:
         await stream_manager.broadcast_event('positions', self.open_positions)
 
     async def sell_contract(self, contract_id: str, reason: str = "Manual Exit"):
-        """Closes an open contract at market price."""
-        if not self.ws or not self.is_connected: return
+        """
+        Closes an open contract at market price.
+        Returns: (bool, Optional[str]) -> (Success, ErrorMessage)
+        """
+        if not self.ws or not self.is_connected: 
+            return False, "Not connected to Deriv"
         
         logger.info(f"Closing Contract {contract_id}. Reason: {reason}")
         req = {
@@ -1095,18 +1175,19 @@ class DerivConnector:
         
         resp = await self.send_request(req)
         if 'error' in resp:
+            err_msg = resp['error'].get('message', 'Unknown Error')
             logger.error(f"Failed to close contract {contract_id}: {resp['error']}")
             await stream_manager.broadcast_log({
                 "id": str(uuid.uuid4()),
                 "timestamp": datetime.now().isoformat(),
-                "message": f"Exit Failed for {contract_id}: {resp['error'].get('message', 'Unknown Error')}",
+                "message": f"Exit Failed for {contract_id}: {err_msg}",
                 "level": "error",
                 "source": "Execution"
             })
-            return False
+            return False, err_msg
             
         logger.info(f"Contract {contract_id} closed successfully ({reason}).")
-        return True
+        return True, None
 
     async def disconnect(self):
         self.is_connected = False
@@ -1163,7 +1244,8 @@ class DerivConnector:
             await self.subscribe_ticks()
 
         # Reset engine and stats for clean start
-        self.engine.reset()
+        if api_symbol in self.processors:
+            self.processors[api_symbol].engine.reset()
         self.tick_count = 0
 
 # Global Singleton Instance

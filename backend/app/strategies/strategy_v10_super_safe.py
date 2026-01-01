@@ -11,6 +11,7 @@ This strategy is optimized for V10's smoother price action with:
 
 from typing import Dict, Optional
 from .base_strategy import BaseStrategy
+from ..signals.ultra_fast_filter import ultra_fast_filter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,16 +45,16 @@ class V10SuperSafeStrategy(BaseStrategy):
             "use_ma_trend": True,
             "ma_fast": 14,
             "ma_slow": 40,
-            "min_ma_slope": 0.001,  # Even faster
-            "adx_threshold": 10,
-            "sideways_slope_threshold": 0.0, # NO SIDEWAYS FILTER
+            "min_ma_slope": 0.0002,
+            "adx_threshold": 15,
+            "sideways_slope_threshold": 0.0001,
             
             # Entry Logic
             "rsi_period": 14,
-            "rsi_buy_min": 45,  # Broadened from 48
-            "rsi_buy_max": 70,  # Broadened from 62
-            "rsi_sell_min": 30, # Broadened from 38
-            "rsi_sell_max": 55, # Keep for safety
+            "rsi_buy_min": 45,
+            "rsi_buy_max": 75,
+            "rsi_sell_min": 25,
+            "rsi_sell_max": 55,
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
             
@@ -131,26 +132,34 @@ class V10SuperSafeStrategy(BaseStrategy):
         if market_mode == "chaotic":
              return None
         
+        # === ADAPTIVE THRESHOLDS ===
+        # Dynamically loosen or tighten based on market mode
+        adapted_config = engine.adapt_thresholds(self.config, market_mode)
+        conf_threshold = adapted_config.get("confidence_threshold", 60)
+        
         # === FILTER 2: Trend Validation (ENABLED) ===
         if abs(ma_slope) < self.config["sideways_slope_threshold"]:
             logger.info(f"[V10] Trade rejected: Sideways market (Slope: {ma_slope:.6f}, RSI: {rsi:.1f})")
             return None
             
-        # if adx < self.config["adx_threshold"]:
-        #     logger.info(f"[V10] Trade rejected: Weak trend (ADX: {adx:.1f})")
-        #     return None
+        if adx < self.config["adx_threshold"]:
+            logger.info(f"[V10] Trade rejected: Weak trend (ADX: {adx:.1f})")
+            return None
             
-        # if abs(ma_slope) < self.config["min_ma_slope"]:
-        #     logger.info(f"[V10] Trade rejected: MA slope too flat ({ma_slope:.5f})")
-        #     return None
+        if abs(ma_slope) < self.config["min_ma_slope"]:
+            logger.info(f"[V10] Trade rejected: MA slope too flat ({ma_slope:.5f})")
+            return None
         
         # === FILTER 3: Candle Quality ===
         # if self.config["reject_wick_spikes"] and candle_range > 0:
         #     pass
         
         # === ENTRY LOGIC: BUY CONDITIONS ===
-        # Allow BULLISH or NEUTRAL trend if RSI supports it
-        if ma_trend == "bullish" or (ma_trend == "neutral" and rsi > 50):
+        # Safety: Strict alignment of MA trend AND RSI sweet spot (using adapted config)
+        rsi_buy_min = adapted_config.get("rsi_buy_min", self.config["rsi_buy_min"])
+        rsi_buy_max = adapted_config.get("rsi_buy_max", self.config["rsi_buy_max"])
+        
+        if ma_trend == "bullish" and rsi_buy_min <= rsi <= rsi_buy_max:
             
             # --- MTF FILTER (1-Hour Alignment) ---
             # Soften: Instead of hard reject, give it a confidence penalty
@@ -164,11 +173,23 @@ class V10SuperSafeStrategy(BaseStrategy):
             # Assuming indicator_data has a reference to the layer OR we use the stored data
             rsi_hybrid = None
             if hasattr(engine, 'indicator_layer'):
-                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("BUY")
+                rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("BUY")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_buy", True):
-                logger.info(f"[V10] BUY rejected by RSI Hybrid Mode: {rsi_hybrid.get('summary')}")
+                logger.info(f"[V10] BUY rejected by MTF-RSI: {rsi_hybrid.get('summary')}")
                 return None
+            
+            # --- ULTRA-FAST ENTRY FILTER ---
+            current_candle = candles_1m[-1] if candles_1m else None
+            if current_candle:
+                fast_filter = ultra_fast_filter.filter_entry(
+                    current_candle, 
+                    "BUY", 
+                    rsi_momentum_up=rsi_hybrid.get("momentum_up") if rsi_hybrid else None
+                )
+                if not fast_filter["allow_entry"]:
+                    logger.info(f"[V10] BUY rejected by UltraFastFilter: {fast_filter['reason']}")
+                    return None
             
             # All conditions met for BUY
             conf_data = {
@@ -187,8 +208,9 @@ class V10SuperSafeStrategy(BaseStrategy):
             
             smart_confidence += mtf_penalty
             
-            if smart_confidence < 5:
-               pass
+            if smart_confidence < conf_threshold:
+               logger.info(f"[V10] BUY rejected: Low confidence ({smart_confidence:.1f} < {conf_threshold})")
+               return None
             
             # --- Dynamic SL/TP Calculation ---
             # Calculate ATR(14) from 1m candles for accurate sizing
@@ -218,7 +240,7 @@ class V10SuperSafeStrategy(BaseStrategy):
                 "action": "BUY",
                 "tp": tp_dist, 
                 "sl": sl_dist,
-                "confidence": max(50, smart_confidence), 
+                "confidence": smart_confidence, 
                 "market_mode": market_mode,
                 "strategy": self.name,
                 "details": {
@@ -229,8 +251,11 @@ class V10SuperSafeStrategy(BaseStrategy):
             }
         
         # === ENTRY LOGIC: SELL CONDITIONS ===
-        # Allow BEARISH or NEUTRAL trend if RSI supports it
-        if ma_trend == "bearish" or (ma_trend == "neutral" and rsi < 50): 
+        # Safety: Strict alignment of MA trend AND RSI sweet spot (using adapted config)
+        rsi_sell_min = adapted_config.get("rsi_sell_min", self.config["rsi_sell_min"])
+        rsi_sell_max = adapted_config.get("rsi_sell_max", self.config["rsi_sell_max"])
+        
+        if ma_trend == "bearish" and rsi_sell_min <= rsi <= rsi_sell_max:
             
             # --- MTF FILTER (1-Hour Alignment) ---
             mtf_penalty = 0
@@ -241,11 +266,23 @@ class V10SuperSafeStrategy(BaseStrategy):
             # --- RSI HYBRID MODE FILTER ---
             rsi_hybrid = None
             if hasattr(engine, 'indicator_layer'):
-                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("SELL")
+                rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("SELL")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_sell", True):
-                logger.info(f"[V10] SELL rejected by RSI Hybrid Mode: {rsi_hybrid.get('summary')}")
+                logger.info(f"[V10] SELL rejected by MTF-RSI: {rsi_hybrid.get('summary')}")
                 return None
+                
+            # --- ULTRA-FAST ENTRY FILTER ---
+            current_candle = candles_1m[-1] if candles_1m else None
+            if current_candle:
+                fast_filter = ultra_fast_filter.filter_entry(
+                    current_candle, 
+                    "SELL", 
+                    rsi_momentum_down=rsi_hybrid.get("momentum_down") if rsi_hybrid else None
+                )
+                if not fast_filter["allow_entry"]:
+                    logger.info(f"[V10] SELL rejected by UltraFastFilter: {fast_filter['reason']}")
+                    return None
             
             # All conditions met for SELL
             conf_data = {
@@ -264,8 +301,9 @@ class V10SuperSafeStrategy(BaseStrategy):
             
             smart_confidence += mtf_penalty
             
-            if smart_confidence < 50:
-                pass
+            if smart_confidence < conf_threshold:
+                logger.info(f"[V10] SELL rejected: Low confidence ({smart_confidence:.1f} < {conf_threshold})")
+                return None
                 
             # --- Dynamic SL/TP Calculation (SELL) ---
             import numpy as np
@@ -315,30 +353,34 @@ class V10SuperSafeStrategy(BaseStrategy):
             # Higher structure score = more confidence
             if structure_score > 70:
                 confidence += 0.2
-            elif structure_score > 60:
+            elif structure_score > 55:
                 confidence += 0.1
                 
-            # RSI in sweet spot
-            if 50 <= rsi <= 58:
-                confidence += 0.15
+            # RSI in sweet spot (Strongest momentum)
+            if 55 <= rsi <= 65:
+                confidence += 0.2
+            elif 45 <= rsi < 55:
+                confidence += 0.1
                 
-            # Strong MACD
-            if macd_hist > 0.0001:
-                confidence += 0.15
+            # MACD Histogram positive and growing
+            if macd_hist > 0:
+                confidence += 0.1
                 
         else:  # SELL
             # Lower structure score = more confidence
             if structure_score < 30:
                 confidence += 0.2
-            elif structure_score < 40:
+            elif structure_score < 45:
                 confidence += 0.1
                 
             # RSI in sweet spot
-            if 42 <= rsi <= 50:
-                confidence += 0.15
+            if 35 <= rsi <= 45:
+                confidence += 0.2
+            elif 45 < rsi <= 55:
+                confidence += 0.1
                 
-            # Strong MACD
-            if macd_hist < -0.0001:
-                confidence += 0.15
+            # MACD Histogram negative
+            if macd_hist < 0:
+                confidence += 0.1
         
         return min(0.95, max(0.10, confidence))

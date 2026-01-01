@@ -37,9 +37,10 @@ async def close_trade(request: dict):
         return {"status": "error", "message": "Contract ID required"}
         
     logger.info(f"Manual Close Request: {contract_id}")
-    success = await deriv_client.sell_contract(contract_id, reason="User Manual Action")
+    success, error_msg = await deriv_client.sell_contract(contract_id, reason="User Manual Action")
     
     if success:
         return {"status": "success", "message": f"Position {contract_id} close requested."}
     else:
-        return {"status": "error", "message": "Failed to close position."}
+        # Relay specific broker error (e.g., 'Resale not offered')
+        return {"status": "error", "message": error_msg or "Failed to close position."}

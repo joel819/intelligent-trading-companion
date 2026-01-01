@@ -5,6 +5,7 @@ Specialized strategy for Volatility 75 Index with Scalping Optimization.
 
 from typing import Dict, Optional, Any, List
 from .base_strategy import BaseStrategy
+from ..signals.ultra_fast_filter import ultra_fast_filter
 import logging
 import numpy as np
 
@@ -36,7 +37,7 @@ class V75SuperSafeStrategy(BaseStrategy):
             "ma_slow": 40,
             "min_ma_slope": 0.001,
             "adx_threshold": 10,
-            "sideways_slope_threshold": 0.0, # NO SIDEWAYS FILTER
+            "sideways_slope_threshold": 0.0005,
             
             # Entry Logic
             "rsi_period": 14,
@@ -107,10 +108,21 @@ class V75SuperSafeStrategy(BaseStrategy):
             # Hybrid RSI from IndicatorLayer
             rsi_hybrid = None
             if hasattr(engine, 'indicator_layer'):
-                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("BUY")
+                rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("BUY")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_buy", True):
                 return None
+                
+            # --- ULTRA-FAST ENTRY FILTER ---
+            current_candle = candles_1m[-1] if candles_1m else None
+            if current_candle:
+                fast_filter = ultra_fast_filter.filter_entry(
+                    current_candle, 
+                    "BUY", 
+                    rsi_momentum_up=rsi_hybrid.get("momentum_up") if rsi_hybrid else None
+                )
+                if not fast_filter["allow_entry"]:
+                    return None
 
             # Calculate ATR for SL/TP
             closes = np.array([c['close'] for c in candles_1m])
@@ -147,10 +159,21 @@ class V75SuperSafeStrategy(BaseStrategy):
                 
             rsi_hybrid = None
             if hasattr(engine, 'indicator_layer'):
-                rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("SELL")
+                rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("SELL")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_sell", True):
                 return None
+                
+            # --- ULTRA-FAST ENTRY FILTER ---
+            current_candle = candles_1m[-1] if candles_1m else None
+            if current_candle:
+                fast_filter = ultra_fast_filter.filter_entry(
+                    current_candle, 
+                    "SELL", 
+                    rsi_momentum_down=rsi_hybrid.get("momentum_down") if rsi_hybrid else None
+                )
+                if not fast_filter["allow_entry"]:
+                    return None
 
             closes = np.array([c['close'] for c in candles_1m])
             highs = np.array([c['high'] for c in candles_1m])

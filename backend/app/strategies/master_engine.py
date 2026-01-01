@@ -348,10 +348,10 @@ class MasterEngine:
         wick_total = (c['high'] - max(c['close'], c['open'])) + (min(c['close'], c['open']) - c['low'])
         
         # 1. Wick-to-body ratio > 3x
-        if (wick_total / body) > 10.0: # Relaxed for scalping (was 3.0)
+        if (wick_total / body) > 4.0: # Tightened from 10.0
             return True
             
-        # 2. ATR Spike > 3.5x average (Adjusted by Multiplier)
+        # 2. ATR Spike > 2.5x average (Adjusted by Multiplier)
         highs = np.array([x['high'] for x in candles])
         lows = np.array([x['low'] for x in candles])
         closes = np.array([x['close'] for x in candles])
@@ -361,9 +361,9 @@ class MasterEngine:
         sensitivity = self.current_profile.get("noise_sensitivity", "medium")
         
         # Adjust threshold based on sensitivity
-        threshold = 3.5 # Relaxed from 2.5
-        if sensitivity == "low": threshold = 5.0 # Relaxed from 3.5
-        elif sensitivity == "high": threshold = 2.5 # Relaxed from 2.0
+        threshold = 2.5 # Tightened from 3.5
+        if sensitivity == "low": threshold = 3.5 # Tightened from 5.0
+        elif sensitivity == "high": threshold = 2.0 # Tightened from 2.5
             
         # Apply profile multiplier to normalized checking
         if atr[-1] > (np.mean(atr) * threshold * atr_mult):
@@ -446,21 +446,48 @@ class MasterEngine:
     # ==================================================================
 
     def adapt_thresholds(self, raw_filters: Dict, market_state: str) -> Dict:
+        """
+        Dynamically adapt strategy thresholds based on market state.
+        
+        Args:
+            raw_filters: The strategy's current configuration dictionary.
+            market_state: The detected market mode (e.g., "strong_trend", "range").
+            
+        Returns:
+            A modified copy of the filters.
+        """
         adapted = raw_filters.copy()
         
         if market_state == "strong_trend":
-            # Loosen RSI
-            if "rsi_max" in adapted: adapted["rsi_max"] = 80 # was 70
-            if "rsi_min" in adapted: adapted["rsi_min"] = 20 # was 30
+            # Loosen RSI: Allow momentum to carry the trade further
+            # V10 specific keys
+            if "rsi_buy_max" in adapted: adapted["rsi_buy_max"] = 82 
+            if "rsi_sell_min" in adapted: adapted["rsi_sell_min"] = 18
+            
+            # Legacy/General keys
+            if "rsi_max" in adapted: adapted["rsi_max"] = 80 
+            if "rsi_min" in adapted: adapted["rsi_min"] = 20
+            
+            # Loosen confidence slightly for fast execution in trends
+            adapted["confidence_threshold"] = 55 
+            
+            logger.info(f"[MasterEngine] Strategy ADAPTED for {market_state}: Loosening filters for Speed")
         
         elif market_state == "range":
-            # Require stronger confirmation
-            adapted["confidence_threshold"] = adapted.get("confidence_threshold", 50) + 10
+            # Tighten RSI: Avoid entries at the edges of the range where reversal is likely
+            if "rsi_buy_max" in adapted: adapted["rsi_buy_max"] = 62
+            if "rsi_sell_min" in adapted: adapted["rsi_sell_min"] = 38
             
-        elif market_state == "neutral": # calm
-            # Bigger TP allowed
-             if "tp_multiplier" in adapted: adapted["tp_multiplier"] = 2.0
-             
+            # Require stronger confirmation in choppy ranges
+            adapted["confidence_threshold"] = 70
+            
+            logger.info(f"[MasterEngine] Strategy ADAPTED for {market_state}: Tightening filters for Safety")
+            
+        elif market_state == "chaotic":
+            # Maximum safety
+            adapted["confidence_threshold"] = 85
+            logger.warning(f"[MasterEngine] Strategy ADAPTED for {market_state}: Maximum Safety (High Threshold)")
+            
         return adapted
 
     # ==================================================================

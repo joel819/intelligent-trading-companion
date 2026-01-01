@@ -25,7 +25,7 @@ interface TradingContextType {
     botStatus: BotStatus;
     toggleBot: () => void;
     executeTrade: (params: any) => void;
-    closePosition: (contractId: string) => void;
+    closePosition: (contractId: string) => Promise<any>;
     notifications: Notification[];
     markNotificationRead: (id: string) => void;
     marketStatus: {
@@ -47,15 +47,17 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
     const [symbols, setSymbols] = useState<any[]>([]);
-    const [selectedSymbol, setSelectedSymbol] = useState('R_100');
+    const [selectedSymbol, setSelectedSymbol] = useState('R_10');
     const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
     const [skippedSignals, setSkippedSignals] = useState<SkippedSignal[]>([]);
-    const [marketStatus, setMarketStatus] = useState({
+    const [marketStatuses, setMarketStatuses] = useState<Record<string, any>>({});
+
+    const marketStatus = marketStatuses[selectedSymbol] || {
         regime: 'Analyzing...',
         volatility: 'Unknown',
         active_strategy: 'Loading...',
-        symbol: '---'
-    });
+        symbol: selectedSymbol
+    };
 
     const { showNotification } = useNotifications();
 
@@ -69,7 +71,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         uptime: 0,
         tradesExecuted: 0,
         profitToday: 0,
-        symbol: "R_100"
+        symbol: "R_10"
     } as BotStatus } = useQuery({
         queryKey: ['botStatus'],
         queryFn: api.bot.getStatus,
@@ -268,7 +270,12 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
                         if (!Array.isArray(old)) return old;
                         return old.map(acc => acc.id === data.data.account_id ? { ...acc, ...data.data } : acc);
                     });
-                    if (data.type === 'market_status') setMarketStatus(data.data);
+                    if (data.type === 'market_status') {
+                        setMarketStatuses(prev => ({
+                            ...prev,
+                            [data.data.symbol]: data.data
+                        }));
+                    }
                     if (data.type === 'signal_skipped') setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
                     if (data.type === 'notification') {
                         const { title, body } = data.data;
@@ -327,7 +334,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         botStatus,
         toggleBot: () => toggleBotMutation.mutate(botStatus.isRunning),
         executeTrade: (params: any) => executeTradeMutation.mutate(params),
-        closePosition: (contractId: string) => closePositionMutation.mutate(contractId),
+        closePosition: (contractId: string) => closePositionMutation.mutateAsync(contractId),
         notifications: MOCK_NOTIFICATIONS,
         markNotificationRead: (id: string) => console.log("Read", id),
         marketStatus,

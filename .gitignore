@@ -42,3 +42,4 @@ temp_*/
 
 # Gemini artifacts (optional - keep local)
 .gemini/
+nohup.out

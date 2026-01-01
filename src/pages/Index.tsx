@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -70,9 +70,11 @@ const Index = () => {
   // Stabilize connection state to prevent flickering
   const [hasConnectedOnce, setHasConnectedOnce] = useState(false);
 
-  if (isConnected && !hasConnectedOnce) {
-    setHasConnectedOnce(true);
-  }
+  useEffect(() => {
+    if (isConnected && !hasConnectedOnce) {
+      setHasConnectedOnce(true);
+    }
+  }, [isConnected, hasConnectedOnce]);
 
   // Only show full-screen loader if we have NEVER connected and aren't bypassed
   const showFullScreenLoader = !hasConnectedOnce && !isConnected && !isBypassed;

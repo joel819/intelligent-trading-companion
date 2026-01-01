@@ -6,6 +6,7 @@ Specialized SELL-only strategy for Boom 300 Index.
 from typing import Dict, Optional
 from collections import deque
 from .base_strategy import BaseStrategy
+from ..signals.ultra_fast_filter import ultra_fast_filter
 import logging
 
 logger = logging.getLogger(__name__)
@@ -84,10 +85,22 @@ class Boom300SafeStrategy(BaseStrategy):
         # === RULE 3: RSI HYBRID MODE FILTER (Replaces old RSI check) ===
         rsi_hybrid = None
         if hasattr(engine, 'indicator_layer'):
-            rsi_hybrid = engine.indicator_layer.get_rsi_confirmation("SELL")
+            rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("SELL")
         
         if rsi_hybrid and not rsi_hybrid.get("allow_sell", True):
             return None
+            
+        # === ULTRA-FAST ENTRY FILTER ===
+        current_candle = candles_1m[-1] if candles_1m else None
+        if current_candle:
+            fast_filter = ultra_fast_filter.filter_entry(
+                current_candle, 
+                "SELL", 
+                rsi_momentum_down=rsi_hybrid.get("momentum_down") if rsi_hybrid else None
+            )
+            if not fast_filter["allow_entry"]:
+                logger.info(f"[BOOM300] SELL rejected by UltraFastFilter: {fast_filter['reason']}")
+                return None
             
         # === RULE 4: Volatility ===
         if volatility_state == 'extreme':
