@@ -12,7 +12,7 @@ import { StrategySettings } from '@/components/settings/StrategySettings';
 import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 import { AccountsList } from '@/components/accounts/AccountsList';
-// import { useMockData } from '@/hooks/useMockData';
+import { PriceChart } from '@/components/charts/PriceChart';
 import { useTradingData } from '@/hooks/useTradingData';
 import { Wallet, TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -150,6 +150,9 @@ const Index = () => {
                 />
               </div>
 
+              {/* Price Chart */}
+              <PriceChart symbol={selectedSymbol || 'VOLATILITY 75'} />
+
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column */}
@@ -168,10 +171,10 @@ const Index = () => {
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <button onClick={() => handleManualTrade('CALL')} className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded font-bold">
+                      <button onClick={() => handleManualTrade('CALL')} className="px-4 py-2 bg-buy hover:bg-buy/80 text-white rounded font-bold">
                         BUY / CALL (Up)
                       </button>
-                      <button onClick={() => handleManualTrade('PUT')} className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded font-bold">
+                      <button onClick={() => handleManualTrade('PUT')} className="px-4 py-2 bg-sell hover:bg-sell/80 text-white rounded font-bold">
                         SELL / PUT (Down)
                       </button>
                     </div>
