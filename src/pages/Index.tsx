@@ -13,6 +13,7 @@ import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
 import { AccountsList } from '@/components/accounts/AccountsList';
 import { PriceChart } from '@/components/charts/PriceChart';
+import { SymbolSelector } from '@/components/dashboard/SymbolSelector';
 import { useTradingData } from '@/hooks/useTradingData';
 import { Wallet, TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,7 +37,9 @@ const Index = () => {
     markNotificationRead,
     isConnected,
     executeTrade,
-    selectedSymbol
+    selectedSymbol,
+    setSelectedSymbol,
+    symbols
   } = useTradingData();
 
   const handleNotificationsClick = () => {
@@ -120,6 +123,15 @@ const Index = () => {
         <main className="pt-20 pb-8 px-4 md:px-6">
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in">
+              {/* Symbol Selector */}
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <SymbolSelector
+                  symbols={symbols}
+                  selectedSymbol={selectedSymbol}
+                  onSymbolChange={setSelectedSymbol}
+                />
+              </div>
+
               {/* Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
