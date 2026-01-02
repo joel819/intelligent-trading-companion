@@ -7,7 +7,8 @@ import {
   Wallet,
   ChevronLeft,
   ChevronRight,
-  Bot
+  Bot,
+  History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ interface SidebarProps {
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'positions', label: 'Positions', icon: Activity },
+  { id: 'history', label: 'Trade History', icon: History },
   { id: 'accounts', label: 'Accounts', icon: Wallet },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'notifications', label: 'Alerts', icon: Bell },
