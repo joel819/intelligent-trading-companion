@@ -8,6 +8,7 @@ import { PositionsTable } from '@/components/dashboard/PositionsTable';
 import { TickFeed } from '@/components/dashboard/TickFeed';
 import { LogsStream } from '@/components/dashboard/LogsStream';
 import { SkippedSignalsPanel } from '@/components/dashboard/SkippedSignalsPanel';
+import { MLInsightsPanel } from '@/components/dashboard/MLInsightsPanel';
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
@@ -39,7 +40,8 @@ const Index = () => {
     executeTrade,
     selectedSymbol,
     setSelectedSymbol,
-    symbols
+    symbols,
+    marketStatus
   } = useTradingData();
 
   const handleNotificationsClick = () => {
@@ -203,6 +205,24 @@ const Index = () => {
 
                 {/* Right Column */}
                 <div className="space-y-6">
+                  <MLInsightsPanel
+                    prediction={{
+                      buyProbability: skippedSignals.length > 0 
+                        ? Math.max(0.3, Math.min(0.9, skippedSignals[0]?.confidence || 0.5))
+                        : 0.52,
+                      sellProbability: skippedSignals.length > 0 
+                        ? Math.max(0.2, Math.min(0.8, 1 - (skippedSignals[0]?.confidence || 0.5)))
+                        : 0.48,
+                      confidence: skippedSignals.length > 0 
+                        ? skippedSignals[0]?.confidence || 0.65
+                        : 0.72,
+                      regime: marketStatus.regime || 'trending',
+                      volatility: marketStatus.volatility || 'medium',
+                      lastUpdated: skippedSignals[0]?.timestamp || new Date().toISOString()
+                    }}
+                    skippedSignals={skippedSignals}
+                    symbol={selectedSymbol}
+                  />
                   <BotControl status={botStatus} onToggle={toggleBot} />
                   <MarketStatusCard />
                   <TickFeed ticks={ticks.filter((t: any) => t?.symbol === selectedSymbol)} />
