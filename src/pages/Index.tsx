@@ -10,6 +10,7 @@ import { LogsStream } from '@/components/dashboard/LogsStream';
 import { SkippedSignalsPanel } from '@/components/dashboard/SkippedSignalsPanel';
 import { MLInsightsPanel } from '@/components/dashboard/MLInsightsPanel';
 import { TradeHistory } from '@/components/dashboard/TradeHistory';
+import { PerformanceAnalytics } from '@/components/dashboard/PerformanceAnalytics';
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
@@ -247,6 +248,13 @@ const Index = () => {
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-xl font-semibold">Trade History</h2>
               <TradeHistory />
+            </div>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="space-y-6 animate-fade-in">
+              <h2 className="text-xl font-semibold">Performance Analytics</h2>
+              <PerformanceAnalytics />
             </div>
           )}
 
