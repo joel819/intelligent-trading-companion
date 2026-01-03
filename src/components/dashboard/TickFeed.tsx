@@ -29,8 +29,8 @@ export const TickFeed = ({ ticks = [] }: TickFeedProps) => {
             >
               <span className="font-medium">{tick.symbol}</span>
               <div className="flex items-center gap-4 font-mono text-xs">
-                <span className="text-success">{(tick.bid || 0).toFixed(tick.symbol.includes('JPY') ? 3 : 5)}</span>
-                <span className="text-destructive">{(tick.ask || 0).toFixed(tick.symbol.includes('JPY') ? 3 : 5)}</span>
+                <span className="text-success">{(tick.bid || 0).toFixed(tick.symbol?.includes('JPY') ? 3 : 5)}</span>
+                <span className="text-destructive">{(tick.ask || 0).toFixed(tick.symbol?.includes('JPY') ? 3 : 5)}</span>
                 <span className="text-muted-foreground w-16 text-right">
                   {new Date(tick.timestamp).toLocaleTimeString('en-US', {
                     hour: '2-digit',

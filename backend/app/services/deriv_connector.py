@@ -1,4 +1,5 @@
 import asyncio
+import time
 import json
 import websockets
 import logging
@@ -106,6 +107,10 @@ class DerivConnector:
         
         # Multi-Timeframe Storage (1H Candles)
         self.candles_1h: Dict[str, deque] = {}
+        
+        # Performance & Rate Limit Guards
+        self.contracts_cache: Dict[str, Dict] = {} # {symbol: {"data": [...], "timestamp": float}}
+        self.trade_lock = asyncio.Lock()
         
         # Initialize C++ Engine with new JSON config
         try:
@@ -402,6 +407,7 @@ class DerivConnector:
             return [
                 {
                     "time": datetime.fromtimestamp(c['epoch']).strftime('%H:%M'),
+                    "epoch": c['epoch'],
                     "open": float(c['open']),
                     "high": float(c['high']),
                     "low": float(c['low']),
@@ -743,189 +749,186 @@ class DerivConnector:
         """
         logger.info(f"Initiating Trade: {contract_type} on {symbol} for {amount} ({duration}{duration_unit}). Metadata: {metadata}")
         
-        try:
-            # Map symbols to API format
-            api_symbol = symbol
-            if symbol == "BOOM300": api_symbol = "BOOM300N"
-            elif symbol == "CRASH300": api_symbol = "CRASH300N"
-            
-            # 1. FIFO Refresh (Get available contracts)
-            contracts_req = {"contracts_for": api_symbol}
-            contracts_resp = await self.send_request(contracts_req)
-            
-            if 'error' in contracts_resp:
-                from app.services.audit_logger import audit_logger
-                audit_logger.log_error("FIFO_REFRESH_FAILED", contracts_resp['error'])
-                logger.error(f"FIFO Refresh Failed: {contracts_resp['error']}")
-                return {"status": "error", "message": "FIFO Refresh Failed"}
+        async with self.trade_lock:
+            try:
+                # Map symbols to API format
+                api_symbol = symbol
+                if symbol == "BOOM300": api_symbol = "BOOM300N"
+                elif symbol == "CRASH300": api_symbol = "CRASH300N"
                 
-            contracts = contracts_resp.get('contracts_for', {}).get('available', [])
-            
-            # DEBUG: Log available contract types for this symbol
-            logger.info(f"Available Contracts for {symbol} (API: {api_symbol}): {[c['contract_type'] for c in contracts[:10]]}")
-            
-            # --- AUTO-SWITCH FOR BOOM/CRASH (Multipliers Only) ---
-            # If standard CALL/PUT is requested but not available, switch to MULTUP/MULTDOWN
-            effective_contract_type = contract_type
-            effective_duration = duration
-            effective_duration_unit = duration_unit
-            multiplier = None
-            
-            is_boom_crash = "BOOM" in api_symbol or "CRASH" in api_symbol
-            
-            if is_boom_crash:
-                # Boom/Crash often only supports Multipliers or Accumulators
-                if contract_type == "CALL":
-                    effective_contract_type = "MULTUP"
-                elif contract_type == "PUT":
-                    effective_contract_type = "MULTDOWN"
+                # 1. FIFO Refresh (Get available contracts with 5-minute cache)
+                now = time.time()
+                contracts = []
                 
-                # Multipliers don't use duration, they use 'multiplier' param
-                # We need to find valid multipliers from contracts
-                valid_multipliers = [c.get('multiplier') for c in contracts if c['contract_type'] == effective_contract_type]
-                if valid_multipliers:
-                     # Flatten list of lists if needed, or just pick first available options
-                     # Usually distinct contracts return list of allowed multipliers
-                     # We'll default to the lowest valid multiplier for safety (usually 10, 20, etc.)
-                     # But contracts response structure for multipliers is complex.
-                     # Simplified: Force multiplier=10 or 20
-                     multiplier = 20 
+                if api_symbol in self.contracts_cache and (now - self.contracts_cache[api_symbol]['timestamp']) < 300:
+                    contracts = self.contracts_cache[api_symbol]['data']
+                    logger.info(f"Using cached contracts for {api_symbol}")
+                else:
+                    # Add a tiny jitter if multiple manual trades are spammed
+                    if metadata and metadata.get("source") == "Manual":
+                        await asyncio.sleep(0.1) # 100ms debounce
+                        
+                    contracts_req = {"contracts_for": api_symbol}
+                    contracts_resp = await self.send_request(contracts_req)
+                    
+                    if 'error' in contracts_resp:
+                        from app.services.audit_logger import audit_logger
+                        audit_logger.log_error("FIFO_REFRESH_FAILED", contracts_resp['error'])
+                        logger.error(f"FIFO Refresh Failed: {contracts_resp['error']}")
+                        return {"status": "error", "message": "FIFO Refresh Failed"}
+                        
+                    contracts = contracts_resp.get('contracts_for', {}).get('available', [])
+                    self.contracts_cache[api_symbol] = {"data": contracts, "timestamp": time.time()}
                 
-                logger.info(f"Auto-Switched Contract for {symbol}: {contract_type} -> {effective_contract_type} (Mult: {multiplier})")
+                # DEBUG: Log available contract types for this symbol
+                logger.info(f"Available Contracts for {symbol} (API: {api_symbol}): {[c['contract_type'] for c in contracts[:5]]}")
+                
+                # --- AUTO-SWITCH FOR BOOM/CRASH (Multipliers Only) ---
+                effective_contract_type = contract_type
+                effective_duration = duration
+                effective_duration_unit = duration_unit
+                multiplier = None
+                
+                is_boom_crash = "BOOM" in api_symbol or "CRASH" in api_symbol
+                
+                if is_boom_crash:
+                    if contract_type == "CALL":
+                        effective_contract_type = "MULTUP"
+                    elif contract_type == "PUT":
+                        effective_contract_type = "MULTDOWN"
+                    
+                    valid_multipliers = [c.get('multiplier') for c in contracts if c['contract_type'] == effective_contract_type]
+                    if valid_multipliers:
+                         multiplier = 20 
+                    
+                    logger.info(f"Auto-Switched Contract for {symbol}: {contract_type} -> {effective_contract_type} (Mult: {multiplier})")
 
-            # 2. Validation & Clamping
-            action_code = 1 if effective_contract_type in ["CALL", "MULTUP"] else 2
-            mock_signal = {
-                "symbol": api_symbol,
-                "action": action_code,
-                "lots": amount,
-                "duration": effective_duration,
-                "duration_unit": effective_duration_unit,
-                "contract_type": effective_contract_type,
-                "multiplier": multiplier
-            }
-            validated_params = TradeManager.validate_and_clamp(mock_signal, contracts)
-            
-            if not validated_params:
-                logger.warning("Trade Rejected by FIFO Validation Guard")
-                return {"status": "error", "message": "FIFO Validation Rejected"}
-                
-            # 3. Create Proposal with SL/TP
-            # Extract SL/TP from metadata if available
-            sl_price = metadata.get('stop_loss') if metadata else None
-            tp_price = metadata.get('take_profit') if metadata else None
-            
-            # Log SL/TP values for verification
-            if sl_price or tp_price:
-                logger.info(f"Trade will include native Deriv SL/TP: SL={sl_price}, TP={tp_price}")
-            
-            proposal_req = TradeManager.create_proposal_payload(validated_params, sl_price, tp_price)
-            proposal_resp = await self.send_request(proposal_req)
-            
-            if 'proposal' in proposal_resp:
-                from app.services.audit_logger import audit_logger
-                proposal_data = proposal_resp['proposal']
-                proposal_id = proposal_data['id']
-                
-                logger.info(f"Proposal Successful: ID={proposal_id}, Spot={proposal_data.get('spot')}, Payout={proposal_data.get('payout')}")
-                
-                # 4. Execution (Buy)
-                buy_req = {"buy": proposal_id, "price": 10000} 
-                logger.info(f"Sending FINAL Buy Request: {buy_req}")
-                buy_resp = await self.send_request(buy_req)
-                
-                logger.info(f"RAW BUY RESPONSE from Deriv: {buy_resp}")
-                
-                # Broadcast trade execution for UI markers
-                await stream_manager.broadcast_event('trade_execution', {
-                    "symbol": symbol,
+                # 2. Validation & Clamping
+                action_code = 1 if effective_contract_type in ["CALL", "MULTUP"] else 2
+                mock_signal = {
+                    "symbol": api_symbol,
+                    "action": action_code,
+                    "lots": amount,
+                    "duration": effective_duration,
+                    "duration_unit": effective_duration_unit,
                     "contract_type": effective_contract_type,
-                    "buy_price": float(buy_resp.get('buy', {}).get('buy_price', 0)),
-                    "timestamp": datetime.now().isoformat(),
-                    "id": buy_resp.get('buy', {}).get('contract_id')
-                })
-                
-                # Log to Audit
-                audit_logger.log_trade(
-                    signal=metadata.get('signal', mock_signal) if metadata else mock_signal,
-                    validation=validated_params['validation_metadata'],
-                    response=buy_resp
-                )
-                
-                if 'error' in buy_resp:
-                    err_msg = buy_resp['error'].get('message', 'Trade Execution Failed')
-                    await stream_manager.broadcast_notification(
-                        "Trade Failed",
-                        f"Failed to place trade on {symbol}: {err_msg}",
-                        "error"
-                    )
-                    return {"status": "error", "message": err_msg}
-                
-                # Broadcast success log
-                # We do NOT trigger immediate portfolio refresh here to avoid race condition 
-                # where API returns old state and wipes our optimistic update.
-                # We rely on periodic sync or proposal_open_contract streams.
-                # await self.send_request({"portfolio": 1})
-                
-                await stream_manager.broadcast_notification(
-                    "Trade Executed",
-                    f"Placed {contract_type} on {symbol} (Stake: {validated_params['amount']})",
-                    "success"
-                )
-                
-                await stream_manager.broadcast_log({
-                    "id": str(uuid.uuid4()),
-                    "timestamp": datetime.now().isoformat(),
-                    "message": f"Successfully placed {contract_type} on {symbol} (Stake: {validated_params['amount']})",
-                    "level": "success",
-                    "source": "Execution"
-                })
-                
-                # Record for tracking
-                if metadata:
-                    cid = str(buy_resp['buy']['contract_id'])
-                    self.contract_metadata[cid] = {
-                        "contract_id": cid,
-                        "symbol": symbol,
-                        "action": "BUY" if action_code == 1 else "SELL",
-                        "entry_price": float(buy_resp['buy']['buy_price']),
-                        "stop_loss": metadata.get('stop_loss'),
-                        "take_profit": metadata.get('take_profit'),
-                        "strategy": metadata.get('strategy')
-                    }
-                
-                # OPTIMISTIC UI UPDATE: Add to local positions immediately
-                new_pos_id = str(buy_resp['buy']['contract_id'])
-                entry_price = float(buy_resp['buy']['buy_price'])
-                current_price = entry_price # Initially same
-                
-                optimistic_pos = {
-                    "id": new_pos_id,
-                    "symbol": symbol,
-                    "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
-                    "lots": float(amount),
-                    "entryPrice": entry_price,
-                    "currentPrice": current_price,
-                    "pnl": 0.0,
-                    "openTime": datetime.now().isoformat()
+                    "multiplier": multiplier
                 }
+                validated_params = TradeManager.validate_and_clamp(mock_signal, contracts)
                 
-                # Avoid duplicates
-                if not any(p['id'] == new_pos_id for p in self.open_positions):
-                    self.open_positions.append(optimistic_pos)
-                    await stream_manager.broadcast_event('positions', self.open_positions)
-                    logger.info("Optimistic UI Update executed for new position.")
+                if not validated_params:
+                    logger.warning("Trade Rejected by FIFO Validation Guard")
+                    return {"status": "error", "message": "FIFO Validation Rejected"}
+                    
+                # 3. Create Proposal with SL/TP
+                sl_price = metadata.get('stop_loss') if metadata else None
+                tp_price = metadata.get('take_profit') if metadata else None
+                
+                if sl_price or tp_price:
+                    logger.info(f"Trade will include native Deriv SL/TP: SL={sl_price}, TP={tp_price}")
+                
+                proposal_req = TradeManager.create_proposal_payload(validated_params, sl_price, tp_price)
+                proposal_resp = await self.send_request(proposal_req)
+                
+                if 'proposal' in proposal_resp:
+                    from app.services.audit_logger import audit_logger
+                    proposal_data = proposal_resp['proposal']
+                    proposal_id = proposal_data['id']
+                    
+                    logger.info(f"Proposal Successful: ID={proposal_id}, Spot={proposal_data.get('spot')}, Payout={proposal_data.get('payout')}")
+                    
+                    # 4. Execution (Buy)
+                    buy_req = {"buy": proposal_id, "price": 10000} 
+                    logger.info(f"Sending FINAL Buy Request: {buy_req}")
+                    buy_resp = await self.send_request(buy_req)
+                    
+                    logger.info(f"RAW BUY RESPONSE from Deriv: {buy_resp}")
+                    
+                    # Broadcast trade execution
+                    await stream_manager.broadcast_event('trade_execution', {
+                        "symbol": symbol,
+                        "contract_type": effective_contract_type,
+                        "buy_price": float(buy_resp.get('buy', {}).get('buy_price', 0)),
+                        "timestamp": datetime.now().isoformat(),
+                        "id": buy_resp.get('buy', {}).get('contract_id')
+                    })
+                    
+                    # Log to Audit
+                    audit_logger.log_trade(
+                        signal=metadata.get('signal', mock_signal) if metadata else mock_signal,
+                        validation=validated_params['validation_metadata'],
+                        response=buy_resp
+                    )
+                    
+                    if 'error' in buy_resp:
+                        err_msg = buy_resp['error'].get('message', 'Trade Execution Failed')
+                        await stream_manager.broadcast_notification(
+                            "Trade Failed",
+                            f"Failed to place trade on {symbol}: {err_msg}",
+                            "error"
+                        )
+                        return {"status": "error", "message": err_msg}
+                    
+                    await stream_manager.broadcast_notification(
+                        "Trade Executed",
+                        f"Placed {contract_type} on {symbol} (Stake: {validated_params['amount']})",
+                        "success"
+                    )
+                    
+                    await stream_manager.broadcast_log({
+                        "id": str(uuid.uuid4()),
+                        "timestamp": datetime.now().isoformat(),
+                        "message": f"Successfully placed {contract_type} on {symbol} (Stake: {validated_params['amount']})",
+                        "level": "success",
+                        "source": "Execution"
+                    })
+                    
+                    # Record for tracking
+                    if metadata:
+                        cid = str(buy_resp['buy']['contract_id'])
+                        self.contract_metadata[cid] = {
+                            "contract_id": cid,
+                            "symbol": symbol,
+                            "action": "BUY" if action_code == 1 else "SELL",
+                            "entry_price": None,
+                            "stop_loss": metadata.get('stop_loss'),
+                            "take_profit": metadata.get('take_profit'),
+                            "strategy": metadata.get('strategy')
+                        }
+                    
+                    # OPTIMISTIC UI UPDATE
+                    new_pos_id = str(buy_resp['buy']['contract_id'])
+                    entry_price = float(buy_resp['buy']['buy_price'])
+                    current_price = entry_price
+                    
+                    optimistic_pos = {
+                        "id": new_pos_id,
+                        "symbol": symbol,
+                        "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
+                        "lots": float(amount),
+                        "entryPrice": entry_price,
+                        "currentPrice": current_price,
+                        "pnl": 0.0,
+                        "openTime": datetime.now().isoformat()
+                    }
+                    
+                    if not any(p['id'] == new_pos_id for p in self.open_positions):
+                        self.open_positions.append(optimistic_pos)
+                        await stream_manager.broadcast_event('positions', self.open_positions)
+                        logger.info("Optimistic UI Update executed for new position.")
 
-                return {"status": "success", "data": buy_resp['buy']}
-            else:
-                from app.services.audit_logger import audit_logger
-                audit_logger.log_error("PROPOSAL_FAILED", proposal_resp.get('error'))
-                logger.error(f"Proposal Failed: {proposal_resp}")
-                return {"status": "error", "message": proposal_resp.get('error', {}).get('message', 'Proposal Failed')}
-                
-        except Exception as e:
-            logger.error(f"Execution Error: {e}")
-            return {"status": "error", "message": str(e)}
+                    return {"status": "success", "data": buy_resp['buy']}
+                else:
+                    from app.services.audit_logger import audit_logger
+                    audit_logger.log_error("PROPOSAL_FAILED", proposal_resp.get('error'))
+                    logger.error(f"Proposal Failed: {proposal_resp}")
+                    return {"status": "error", "message": proposal_resp.get('error', {}).get('message', 'Proposal Failed')}
+                    
+            except Exception as e:
+                logger.error(f"Execution Error: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return {"status": "error", "message": str(e)}
 
     async def monitor_positions_for_sl_tp(self, current_price: float, symbol: str, 
                                           momentum_up: bool = None, momentum_down: bool = None, 
@@ -943,23 +946,25 @@ class DerivConnector:
             if meta.get('symbol') != symbol:
                 continue
                 
-            entry_price = meta.get('entry_price')
-            sl_price = meta.get('stop_loss')
-            tp_price = meta.get('take_profit')
+            entry_price = float(meta.get('entry_price')) if meta.get('entry_price') is not None else None
+            sl_price = float(meta.get('stop_loss')) if meta.get('stop_loss') is not None else None
+            tp_price = float(meta.get('take_profit')) if meta.get('take_profit') is not None else None
             action = meta.get('action', 'BUY')
             
-            if not entry_price:
+            if entry_price is None:
                 continue
+            
+            logger.info(f"Checking SL/TP for {symbol} trade {contract_id}: Price={current_price}, SL={sl_price}, TP={tp_price}, Entry={entry_price}, Action={action}")
             
             should_close = False
             close_reason = ""
             
             # For BUY trades (CALL options)
             if action == "BUY":
-                if sl_price and current_price <= sl_price:
+                if sl_price is not None and current_price <= sl_price:
                     should_close = True
                     close_reason = f"Stop Loss Hit (Price: {current_price} <= SL: {sl_price})"
-                elif tp_price and current_price >= tp_price:
+                elif tp_price is not None and current_price >= tp_price:
                     should_close = True
                     close_reason = f"Take Profit Hit (Price: {current_price} >= TP: {tp_price})"
             
@@ -1097,17 +1102,29 @@ class DerivConnector:
         """Handles real-time updates for a specific open contract."""
         cid = str(contract.get('contract_id'))
         is_sold = contract.get('is_sold')
+        is_expired = contract.get('is_expired')
+        status = contract.get('status', '')
         
-        if is_sold:
+        # Remove position if sold, expired, or has a terminal status (won/lost)
+        is_settled = is_sold or is_expired or status in ['won', 'lost']
+        
+        if is_settled:
             # Remove from active positions
+            original_count = len(self.open_positions)
             self.open_positions = [p for p in self.open_positions if p['id'] != cid]
             # Cleanup metadata
             self.contract_metadata.pop(cid, None)
+            
+            # Immediately broadcast removal if anything changed
+            if len(self.open_positions) < original_count:
+                await stream_manager.broadcast_event('positions', self.open_positions)
+                logger.info(f"Position {cid} removed from active list (status: {status}, is_sold: {is_sold}, is_expired: {is_expired})")
         else:
             # Update or Add position
             contract_type = contract.get('contract_type', '').upper()
-            # Correct price mapping for different contract states
-            entry_price = float(contract.get('entry_tick') or contract.get('entry_spot') or contract.get('buy_price') or 0)
+            # Correct price mapping: Prioritize entry_tick/spot over current_spot.
+            # Do NOT use buy_price as it represents the STAKE.
+            entry_price = float(contract.get('entry_tick') or contract.get('entry_spot') or contract.get('current_spot') or 0)
             current_price = float(contract.get('current_spot') or contract.get('bid_price') or 0)
             
             pos = {
@@ -1179,7 +1196,8 @@ class DerivConnector:
             if not found:
                 self.open_positions.append(pos)
         
-        if is_sold and cid not in self.processed_contracts:
+        # Session Stats & Final Processing for Settled Contracts
+        if is_settled and cid not in self.processed_contracts:
             self.processed_contracts.add(cid)
             
             # Limit set size to prevent memory growth (keep last 1000)
@@ -1241,6 +1259,73 @@ class DerivConnector:
             
         logger.info(f"Contract {contract_id} closed successfully ({reason}).")
         return True, None
+
+    async def get_profit_table(self, limit: int = 50, offset: int = 0):
+        """Fetches the profit table (closed trades history) from Deriv."""
+        if not self.ws or not self.is_connected:
+            return []
+        
+        req = {
+            "profit_table": 1,
+            "description": 1,
+            "limit": limit,
+            "offset": offset,
+            "sort": "DESC"
+        }
+        resp = await self.send_request(req)
+        return resp.get('profit_table', {}).get('transactions', [])
+
+    async def get_statement(self, limit: int = 50, offset: int = 0):
+        """Fetches the account statement (balance changes) from Deriv."""
+        if not self.ws or not self.is_connected:
+            return []
+        
+        req = {
+            "statement": 1,
+            "description": 1,
+            "limit": limit,
+            "offset": offset
+        }
+        resp = await self.send_request(req)
+        return resp.get('statement', {}).get('transactions', [])
+
+    async def get_latest_ml_prediction(self, symbol: str):
+        """Returns the latest ML prediction and analysis for a given symbol."""
+        p = self.processors.get(symbol)
+        if not p:
+            return None
+        
+        # Get latest tick
+        candles = list(p.engine.candles_1m)
+        last_candle = candles[-1] if candles else None
+        
+        # We can re-run analysis or just use cached values if we had them.
+        # For now, let's derive it from the engine state.
+        volatility = p.engine.get_volatility("1m")
+        regime = p.engine.detect_market_mode(candles)
+        
+        # Calculate scores (this is a simplified logic)
+        # In a real scenario, the strategy or a dedicated ML model would provide these.
+        indicator_data = p.indicator_layer.analyze(last_candle, engine=p.engine) if last_candle else {}
+        
+        # Mock probabilities for now based on indicators if no signal
+        buy_prob = 0.5
+        sell_prob = 0.5
+        
+        if indicator_data.get('rsi'):
+            rsi = indicator_data['rsi']
+            buy_prob = max(0.1, min(0.9, (70 - rsi) / 40)) # Lower RSI -> higher buy prob
+            sell_prob = max(0.1, min(0.9, (rsi - 30) / 40)) # Higher RSI -> higher sell prob
+            
+        return {
+            "symbol": symbol,
+            "buyProbability": round(buy_prob, 2),
+            "sellProbability": round(sell_prob, 2),
+            "confidence": round(max(buy_prob, sell_prob), 2),
+            "regime": regime,
+            "volatility": volatility,
+            "lastUpdated": datetime.now().isoformat()
+        }
 
     async def disconnect(self):
         self.is_connected = False

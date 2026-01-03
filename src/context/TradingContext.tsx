@@ -28,6 +28,9 @@ interface TradingContextType {
     closePosition: (contractId: string) => Promise<any>;
     notifications: Notification[];
     markNotificationRead: (id: string) => void;
+    tradeHistory: any[];
+    performanceAnalytics: any[];
+    latestPrediction: any;
     marketStatus: {
         regime: string;
         volatility: string;
@@ -115,14 +118,44 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         enabled: isConnected && botStatus.isAuthorized
     });
 
-    // Fetch initial logs on mount and when connected
+    // 4. Fetch Trade History
+    const { data: tradeHistory = [] } = useQuery({
+        queryKey: ['tradeHistory'],
+        queryFn: () => api.trade.getHistory(),
+        refetchInterval: 10000,
+        enabled: isConnected && botStatus.isAuthorized
+    });
+
+    // 5. Fetch Performance Analytics
+    const { data: performanceAnalytics = [] } = useQuery({
+        queryKey: ['performanceAnalytics'],
+        queryFn: () => api.trade.getAnalytics(),
+        refetchInterval: 30000,
+        enabled: isConnected && botStatus.isAuthorized
+    });
+
+    // 6. Fetch Latest ML Prediction
+    const { data: latestPrediction = {
+        buyProbability: 0.5,
+        sellProbability: 0.5,
+        confidence: 0,
+        regime: "Analyzing...",
+        volatility: "Unknown",
+        lastUpdated: new Date().toISOString()
+    } } = useQuery({
+        queryKey: ['latestPrediction', selectedSymbol],
+        queryFn: () => api.ml.getLatestPrediction(selectedSymbol),
+        refetchInterval: 5000,
+        enabled: isConnected
+    });
+
+    // 7. Fetch initial logs
     useQuery({
         queryKey: ['logs'],
         queryFn: async () => {
             try {
                 const data = await api.logs.get();
                 if (Array.isArray(data)) {
-                    // Merge with existing logs (WebSocket may have added some)
                     setLogs(prev => {
                         const existingIds = new Set(prev.map(l => l.id));
                         const newLogs = data
@@ -146,7 +179,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         enabled: isConnected
     });
 
-    // 4. Fetch Accounts
+    // 7. Fetch Accounts
     const { data: accountsRaw = [] } = useQuery({
         queryKey: ['accounts'],
         queryFn: api.accounts.get,
@@ -168,7 +201,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         isActive: false
     } as Account;
 
-    // 5. Mutations
+    // 8. Mutations
     const toggleBotMutation = useMutation({
         mutationFn: (currentStatus: boolean) => api.bot.toggle(currentStatus ? 'stop' : 'start'),
         onSuccess: () => {
@@ -215,10 +248,10 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         api.accounts.select(id).catch(err => console.error("Failed to select account", err));
     };
 
-    // 6. WebSocket Stream (Singleton)
-    // 6. WebSocket Stream (with Auto-Reconnect & Debugging)
+    // 9. WebSocket Stream (Singleton)
+    // 9. WebSocket Stream (with Auto-Reconnect & Debugging)
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+    const reconnectTimeoutRef = useRef<any>(null);
     const isMounted = useRef(true);
     const reconnectCount = useRef(0);
     const notificationRef = useRef(showNotification);
@@ -260,24 +293,27 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
 
                     if (data.type === 'ping') return;
 
-                    if (data.type === 'tick') setDerivTicks(prev => [data.data, ...prev].slice(0, 50));
-                    if (data.type === 'log') setLogs(prev => {
+                    if (data.type === 'tick' && data.data) setDerivTicks(prev => [data.data, ...prev].slice(0, 50));
+                    if (data.type === 'log' && data.data) setLogs(prev => {
                         if (prev.some(l => l.id === data.data.id)) return prev;
                         return [data.data, ...prev].slice(0, 100);
                     });
-                    if (data.type === 'positions') setPositions(data.data);
-                    if (data.type === 'balance') queryClient.setQueryData(['accounts'], (old: any) => {
+                    if (data.type === 'positions' && data.data) {
+                        console.log('[TradingContext] Received positions update:', data.data.length, 'positions', data.data.map((p: any) => p.id));
+                        setPositions(data.data);
+                    }
+                    if (data.type === 'balance' && data.data) queryClient.setQueryData(['accounts'], (old: any) => {
                         if (!Array.isArray(old)) return old;
                         return old.map(acc => acc.id === data.data.account_id ? { ...acc, ...data.data } : acc);
                     });
-                    if (data.type === 'market_status') {
+                    if (data.type === 'market_status' && data.data) {
                         setMarketStatuses(prev => ({
                             ...prev,
                             [data.data.symbol]: data.data
                         }));
                     }
-                    if (data.type === 'signal_skipped') setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
-                    if (data.type === 'notification') {
+                    if (data.type === 'signal_skipped' && data.data) setSkippedSignals(prev => [data.data, ...prev].slice(0, 50));
+                    if (data.type === 'notification' && data.data) {
                         const { title, body } = data.data;
                         notificationRef.current(title, { body, icon: '/favicon.ico', tag: title });
                     }
@@ -337,6 +373,9 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         closePosition: (contractId: string) => closePositionMutation.mutateAsync(contractId),
         notifications: MOCK_NOTIFICATIONS,
         markNotificationRead: (id: string) => console.log("Read", id),
+        tradeHistory,
+        performanceAnalytics,
+        latestPrediction,
         marketStatus,
         isConnected,
         isAuthorized: botStatus.isAuthorized,

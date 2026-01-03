@@ -168,29 +168,49 @@ TradingEngine engine;
 
 // --- C Exports for Python ctypes ---
 
+#include <cstring>
+
+#include <cstdlib>
+#include <cstring>
+
 extern "C" {
 
 void init_engine(const char *config_json) { engine.initialize(config_json); }
 
-const char *process_tick(const char *tick_json) {
-  static string result;
-  result = engine.process_tick(tick_json);
-  return result.c_str();
+char *process_tick(const char *tick_json) {
+  string result = engine.process_tick(tick_json);
+  char *cstr = (char *)malloc(result.length() + 1);
+  if (cstr) {
+    std::strcpy(cstr, result.c_str());
+  }
+  return cstr;
 }
 
-const char *execute_trade(const char *params_json) {
-  static string result;
-  result = engine.execute_trade(params_json);
-  return result.c_str();
+char *execute_trade(const char *params_json) {
+  string result = engine.execute_trade(params_json);
+  char *cstr = (char *)malloc(result.length() + 1);
+  if (cstr) {
+    std::strcpy(cstr, result.c_str());
+  }
+  return cstr;
 }
 
 void set_cooldown(int seconds) { engine.set_cooldown(seconds); }
 
 void set_bot_state(bool state) { engine.set_bot_state(state); }
 
-const char *get_bot_state() {
-  static string result;
-  result = engine.get_bot_state();
-  return result.c_str();
+char *get_bot_state() {
+  string result = engine.get_bot_state();
+  char *cstr = (char *)malloc(result.length() + 1);
+  if (cstr) {
+    std::strcpy(cstr, result.c_str());
+  }
+  return cstr;
+}
+
+void free_result(char *ptr) {
+  if (ptr) {
+    free(ptr);
+  }
 }
 }

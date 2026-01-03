@@ -25,6 +25,13 @@ export const api = {
             return res.blob();
         }
     },
+    ml: {
+        getLatestPrediction: async (symbol: string) => {
+            const res = await fetch(`${API_BASE}/ml/latest?symbol=${symbol}`);
+            if (!res.ok) throw new Error('Failed to fetch latest ML prediction');
+            return res.json();
+        }
+    },
     settings: {
         get: async () => {
             try {
@@ -92,6 +99,16 @@ export const api = {
                 body: JSON.stringify({ contract_id: contractId }),
             });
             if (!res.ok) throw new Error('Failed to close position');
+            return res.json();
+        },
+        getHistory: async (limit: number = 50, offset: number = 0) => {
+            const res = await fetch(`${API_BASE}/trade/history/?limit=${limit}&offset=${offset}`);
+            if (!res.ok) throw new Error('Failed to fetch trade history');
+            return res.json();
+        },
+        getAnalytics: async () => {
+            const res = await fetch(`${API_BASE}/trade/analytics/`);
+            if (!res.ok) throw new Error('Failed to fetch analytics');
             return res.json();
         }
     },

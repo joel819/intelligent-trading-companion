@@ -17,21 +17,44 @@ class EngineWrapper:
                 cls._lib.init_engine.argtypes = [c_char_p]
                 cls._lib.init_engine.restype = None
                 
-                # const char* process_tick(const char* tick_json)
+                # char* process_tick(const char* tick_json)
+                # MUST use c_void_p to get the pointer address for freeing
                 cls._lib.process_tick.argtypes = [c_char_p]
-                cls._lib.process_tick.restype = c_char_p
+                cls._lib.process_tick.restype = c_void_p
                 
-                # const char* execute_trade(const char* params_json)
+                # char* execute_trade(const char* params_json)
                 cls._lib.execute_trade.argtypes = [c_char_p]
-                cls._lib.execute_trade.restype = c_char_p
+                cls._lib.execute_trade.restype = c_void_p
                 
                 # void set_cooldown(int seconds)
                 cls._lib.set_cooldown.argtypes = [c_int]
                 cls._lib.set_cooldown.restype = None
+
+                # char* get_bot_state()
+                cls._lib.get_bot_state.argtypes = []
+                cls._lib.get_bot_state.restype = c_void_p
+
+                # void free_result(char* ptr)
+                cls._lib.free_result.argtypes = [c_void_p]
+                cls._lib.free_result.restype = None
                 
             except OSError as e:
                 print(f"Error loading C++ library: {e}")
                 raise e
+
+    @classmethod
+    def _ptr_to_str(cls, ptr):
+        """Helper to convert c_void_p to python string and free memory."""
+        if not ptr:
+            return ""
+        try:
+            # Cast to char* to read string
+            cstr = ctypes.cast(ptr, c_char_p)
+            val = cstr.value.decode('utf-8')
+            return val
+        finally:
+            # Always free the C++ allocated memory
+            cls._lib.free_result(ptr)
 
     @classmethod
     def init_engine(cls, config_json: str):
@@ -45,16 +68,16 @@ class EngineWrapper:
         """Process a tick through the C++ engine (ML logic)."""
         cls._load_lib()
         c_tick = tick_json.encode('utf-8')
-        result_ptr = cls._lib.process_tick(c_tick)
-        return ctypes.cast(result_ptr, c_char_p).value.decode('utf-8')
+        ptr = cls._lib.process_tick(c_tick)
+        return cls._ptr_to_str(ptr)
 
     @classmethod
     def execute_trade(cls, params_json: str) -> str:
         """Execute/Validate a trade through the C++ engine safety layer."""
         cls._load_lib()
         c_params = params_json.encode('utf-8')
-        result_ptr = cls._lib.execute_trade(c_params)
-        return ctypes.cast(result_ptr, c_char_p).value.decode('utf-8')
+        ptr = cls._lib.execute_trade(c_params)
+        return cls._ptr_to_str(ptr)
         
     @classmethod
     def set_cooldown(cls, seconds: int):
@@ -75,10 +98,7 @@ class EngineWrapper:
     def get_bot_state(cls) -> dict:
         """Get bot running state and uptime."""
         cls._load_lib()
-        # const char* get_bot_state()
-        cls._lib.get_bot_state.argtypes = []
-        cls._lib.get_bot_state.restype = c_char_p
         
-        res_ptr = cls._lib.get_bot_state()
-        json_str = ctypes.cast(res_ptr, c_char_p).value.decode('utf-8')
+        ptr = cls._lib.get_bot_state()
+        json_str = cls._ptr_to_str(ptr)
         return json.loads(json_str)

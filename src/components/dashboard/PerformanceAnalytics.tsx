@@ -1,15 +1,15 @@
 import { useMemo } from 'react';
-import { 
-  LineChart, 
-  Line, 
-  AreaChart, 
-  Area, 
-  BarChart, 
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
   Bar,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   ReferenceLine
 } from 'recharts';
@@ -33,25 +33,25 @@ const generatePerformanceData = (): DailyStats[] => {
   const data: DailyStats[] = [];
   let equity = 10000;
   let peakEquity = equity;
-  
+
   for (let i = 30; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
-    
+
     const trades = 5 + Math.floor(Math.random() * 15);
     const winRate = 0.45 + Math.random() * 0.25;
     const wins = Math.round(trades * winRate);
     const losses = trades - wins;
-    
+
     // Daily PnL with some variance
     const avgWin = 15 + Math.random() * 25;
     const avgLoss = 10 + Math.random() * 20;
     const pnl = (wins * avgWin) - (losses * avgLoss) + (Math.random() - 0.5) * 50;
-    
+
     equity += pnl;
     peakEquity = Math.max(peakEquity, equity);
     const drawdown = ((peakEquity - equity) / peakEquity) * 100;
-    
+
     data.push({
       date: date.toISOString().split('T')[0],
       equity: Math.round(equity * 100) / 100,
@@ -64,19 +64,19 @@ const generatePerformanceData = (): DailyStats[] => {
       peakEquity
     });
   }
-  
+
   return data;
 };
 
-const StatCard = ({ 
-  label, 
-  value, 
-  subValue, 
-  icon: Icon, 
-  trend 
-}: { 
-  label: string; 
-  value: string; 
+const StatCard = ({
+  label,
+  value,
+  subValue,
+  icon: Icon,
+  trend
+}: {
+  label: string;
+  value: string;
   subValue?: string;
   icon: React.ElementType;
   trend?: 'up' | 'down' | 'neutral';
@@ -109,19 +109,19 @@ const StatCard = ({
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
-  
+
   return (
     <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
       <div className="text-xs text-muted-foreground mb-2">{label}</div>
       {payload.map((entry: any, index: number) => (
         <div key={index} className="flex items-center gap-2 text-sm">
-          <div 
-            className="w-2 h-2 rounded-full" 
-            style={{ backgroundColor: entry.color }} 
+          <div
+            className="w-2 h-2 rounded-full"
+            style={{ backgroundColor: entry.color }}
           />
           <span className="text-muted-foreground">{entry.name}:</span>
           <span className="font-medium text-foreground">
-            {typeof entry.value === 'number' 
+            {typeof entry.value === 'number'
               ? entry.name.includes('%') || entry.name.includes('Rate') || entry.name.includes('Drawdown')
                 ? `${entry.value.toFixed(1)}%`
                 : `$${entry.value.toFixed(2)}`
@@ -134,9 +134,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+import { useTradingData } from '@/hooks/useTradingData';
+
 export const PerformanceAnalytics = () => {
-  const data = useMemo(() => generatePerformanceData(), []);
-  
+  const { performanceAnalytics: data } = useTradingData();
+
   // Calculate summary stats
   const stats = useMemo(() => {
     const totalPnl = data.reduce((sum, d) => sum + d.pnl, 0);
@@ -147,7 +149,7 @@ export const PerformanceAnalytics = () => {
     const currentEquity = data[data.length - 1]?.equity || 0;
     const startEquity = data[0]?.equity - data[0]?.pnl || 10000;
     const returnPct = ((currentEquity - startEquity) / startEquity) * 100;
-    
+
     // Calculate Sharpe ratio approximation
     const dailyReturns = data.map(d => d.pnl / (d.equity - d.pnl));
     const avgReturn = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
@@ -155,7 +157,7 @@ export const PerformanceAnalytics = () => {
       dailyReturns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / dailyReturns.length
     );
     const sharpeRatio = stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0;
-    
+
     return {
       totalPnl,
       totalTrades,
@@ -215,13 +217,13 @@ export const PerformanceAnalytics = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               />
-              <YAxis 
+              <YAxis
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickFormatter={(value) => `$${(value / 1000).toFixed(1)}k`}
@@ -252,13 +254,13 @@ export const PerformanceAnalytics = () => {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={11}
                   tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 />
-                <YAxis 
+                <YAxis
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={11}
                   domain={[0, 100]}
@@ -290,13 +292,13 @@ export const PerformanceAnalytics = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={11}
                   tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 />
-                <YAxis 
+                <YAxis
                   stroke="hsl(var(--muted-foreground))"
                   fontSize={11}
                   tickFormatter={(value) => `$${value}`}
@@ -331,13 +333,13 @@ export const PerformanceAnalytics = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               />
-              <YAxis 
+              <YAxis
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={11}
                 reversed

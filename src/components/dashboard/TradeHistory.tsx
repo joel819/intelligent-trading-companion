@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { 
-  Download, 
-  Filter, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  Download,
+  Filter,
+  TrendingUp,
+  TrendingDown,
   Calendar,
   Search,
   ArrowUpDown,
@@ -47,25 +47,25 @@ const generateMockTrades = (): Trade[] => {
   const symbols = ['R_10', 'R_25', 'R_50', 'R_75', 'R_100', 'BOOM1000', 'CRASH1000'];
   const strategies = ['Scalper', 'Grid Recovery', 'Spike Bot', 'V75 Sniper', 'Breakout'];
   const trades: Trade[] = [];
-  
+
   for (let i = 0; i < 50; i++) {
     const side = Math.random() > 0.5 ? 'buy' : 'sell';
     const entryPrice = 1000 + Math.random() * 500;
     const priceChange = (Math.random() - 0.4) * 50;
-    const exitPrice = side === 'buy' 
-      ? entryPrice + priceChange 
+    const exitPrice = side === 'buy'
+      ? entryPrice + priceChange
       : entryPrice - priceChange;
     const lots = Math.round((0.01 + Math.random() * 0.5) * 100) / 100;
     const pnl = (side === 'buy' ? exitPrice - entryPrice : entryPrice - exitPrice) * lots * 10;
-    
+
     const openDate = new Date();
     openDate.setDate(openDate.getDate() - Math.floor(Math.random() * 30));
     openDate.setHours(Math.floor(Math.random() * 24));
     openDate.setMinutes(Math.floor(Math.random() * 60));
-    
+
     const duration = 60 + Math.floor(Math.random() * 3600);
     const closeDate = new Date(openDate.getTime() + duration * 1000);
-    
+
     trades.push({
       id: `trade-${i}`,
       symbol: symbols[Math.floor(Math.random() * symbols.length)],
@@ -80,7 +80,7 @@ const generateMockTrades = (): Trade[] => {
       duration
     });
   }
-  
+
   return trades.sort((a, b) => new Date(b.closeTime).getTime() - new Date(a.closeTime).getTime());
 };
 
@@ -90,8 +90,10 @@ const formatDuration = (seconds: number): string => {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 };
 
+import { useTradingData } from '@/hooks/useTradingData';
+
 export const TradeHistory = () => {
-  const [trades] = useState<Trade[]>(generateMockTrades);
+  const { tradeHistory: trades } = useTradingData();
   const [searchTerm, setSearchTerm] = useState('');
   const [symbolFilter, setSymbolFilter] = useState<string>('all');
   const [sideFilter, setSideFilter] = useState<string>('all');
@@ -99,8 +101,8 @@ export const TradeHistory = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Get unique symbols for filter
-  const uniqueSymbols = useMemo(() => 
-    [...new Set(trades.map(t => t.symbol))], 
+  const uniqueSymbols = useMemo(() =>
+    [...new Set(trades.map(t => t.symbol))],
     [trades]
   );
 
@@ -109,7 +111,7 @@ export const TradeHistory = () => {
     return trades
       .filter(trade => {
         const matchesSearch = trade.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             trade.strategy.toLowerCase().includes(searchTerm.toLowerCase());
+          trade.strategy.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSymbol = symbolFilter === 'all' || trade.symbol === symbolFilter;
         const matchesSide = sideFilter === 'all' || trade.side === sideFilter;
         return matchesSearch && matchesSymbol && matchesSide;
@@ -118,7 +120,7 @@ export const TradeHistory = () => {
         const aVal = a[sortField];
         const bVal = b[sortField];
         const modifier = sortDirection === 'asc' ? 1 : -1;
-        
+
         if (typeof aVal === 'string' && typeof bVal === 'string') {
           return aVal.localeCompare(bVal) * modifier;
         }
@@ -138,7 +140,7 @@ export const TradeHistory = () => {
     const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
     const avgWin = winningTrades > 0 ? grossProfit / winningTrades : 0;
     const avgLoss = losingTrades > 0 ? grossLoss / losingTrades : 0;
-    
+
     return {
       totalTrades,
       winningTrades,
@@ -175,7 +177,7 @@ export const TradeHistory = () => {
       t.strategy,
       formatDuration(t.duration)
     ]);
-    
+
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -242,7 +244,7 @@ export const TradeHistory = () => {
             <Filter className="w-4 h-4" />
             <span>Filters</span>
           </div>
-          
+
           <div className="relative flex-1 min-w-[200px] max-w-[300px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -252,7 +254,7 @@ export const TradeHistory = () => {
               className="pl-9"
             />
           </div>
-          
+
           <Select value={symbolFilter} onValueChange={setSymbolFilter}>
             <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Symbol" />
@@ -264,7 +266,7 @@ export const TradeHistory = () => {
               ))}
             </SelectContent>
           </Select>
-          
+
           <Select value={sideFilter} onValueChange={setSideFilter}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Side" />
@@ -282,7 +284,7 @@ export const TradeHistory = () => {
               Clear
             </Button>
           )}
-          
+
           <div className="ml-auto">
             <Button onClick={exportToCSV} variant="outline" size="sm">
               <Download className="w-4 h-4 mr-2" />
@@ -298,7 +300,7 @@ export const TradeHistory = () => {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead 
+                <TableHead
                   className="cursor-pointer hover:text-foreground"
                   onClick={() => handleSort('closeTime')}
                 >
@@ -308,7 +310,7 @@ export const TradeHistory = () => {
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </TableHead>
-                <TableHead 
+                <TableHead
                   className="cursor-pointer hover:text-foreground"
                   onClick={() => handleSort('symbol')}
                 >
@@ -321,7 +323,7 @@ export const TradeHistory = () => {
                 <TableHead className="text-right">Entry</TableHead>
                 <TableHead className="text-right">Exit</TableHead>
                 <TableHead className="text-right">Lots</TableHead>
-                <TableHead 
+                <TableHead
                   className="text-right cursor-pointer hover:text-foreground"
                   onClick={() => handleSort('pnl')}
                 >
@@ -355,8 +357,8 @@ export const TradeHistory = () => {
                     <TableCell>
                       <div className={cn(
                         "inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium",
-                        trade.side === 'buy' 
-                          ? "bg-success/20 text-success" 
+                        trade.side === 'buy'
+                          ? "bg-success/20 text-success"
                           : "bg-destructive/20 text-destructive"
                       )}>
                         {trade.side === 'buy' ? (
@@ -394,7 +396,7 @@ export const TradeHistory = () => {
             </TableBody>
           </Table>
         </div>
-        
+
         {/* Footer */}
         <div className="px-4 py-3 border-t border-border text-xs text-muted-foreground">
           Showing {filteredTrades.length} of {trades.length} trades

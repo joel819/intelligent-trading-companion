@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 from app.core.engine_wrapper import EngineWrapper
 
 router = APIRouter()
@@ -36,3 +37,21 @@ def predict(request: PredictionRequest):
         return signal
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/latest")
+async def get_latest_prediction(symbol: str = "R_100"):
+    """Returns the latest active prediction for a symbol."""
+    from app.services.deriv_connector import deriv_client
+    prediction = await deriv_client.get_latest_ml_prediction(symbol)
+    if not prediction:
+        # Fallback empty prediction
+        return {
+            "symbol": symbol,
+            "buyProbability": 0.5,
+            "sellProbability": 0.5,
+            "confidence": 0,
+            "regime": "Analyzing...",
+            "volatility": "Unknown",
+            "lastUpdated": datetime.now().isoformat()
+        }
+    return prediction

@@ -43,7 +43,8 @@ const Index = () => {
     selectedSymbol,
     setSelectedSymbol,
     symbols,
-    marketStatus
+    marketStatus,
+    latestPrediction
   } = useTradingData();
 
   const handleNotificationsClick = () => {
@@ -208,20 +209,7 @@ const Index = () => {
                 {/* Right Column */}
                 <div className="space-y-6">
                   <MLInsightsPanel
-                    prediction={{
-                      buyProbability: skippedSignals.length > 0 
-                        ? Math.max(0.3, Math.min(0.9, skippedSignals[0]?.confidence || 0.5))
-                        : 0.52,
-                      sellProbability: skippedSignals.length > 0 
-                        ? Math.max(0.2, Math.min(0.8, 1 - (skippedSignals[0]?.confidence || 0.5)))
-                        : 0.48,
-                      confidence: skippedSignals.length > 0 
-                        ? skippedSignals[0]?.confidence || 0.65
-                        : 0.72,
-                      regime: marketStatus.regime || 'trending',
-                      volatility: marketStatus.volatility || 'medium',
-                      lastUpdated: skippedSignals[0]?.timestamp || new Date().toISOString()
-                    }}
+                    prediction={latestPrediction}
                     skippedSignals={skippedSignals}
                     symbol={selectedSymbol}
                   />

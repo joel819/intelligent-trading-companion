@@ -91,7 +91,6 @@ class TradeManager:
         """
         payload = {
             "proposal": 1,
-            "subscribe": 1,
             "amount": params['amount'],
             "basis": params['basis'],
             "contract_type": params['contract_type'],

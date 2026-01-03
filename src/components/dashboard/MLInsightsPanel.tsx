@@ -25,7 +25,7 @@ const ConfidenceGauge = ({ value, label }: { value: number; label: string }) => 
     if (percentage >= 40) return 'text-warning';
     return 'text-destructive';
   };
-  
+
   return (
     <div className="flex flex-col items-center gap-2">
       <div className="relative w-20 h-20">
@@ -60,16 +60,16 @@ const ConfidenceGauge = ({ value, label }: { value: number; label: string }) => 
   );
 };
 
-const ProbabilityBar = ({ 
-  buyProb, 
-  sellProb 
-}: { 
-  buyProb: number; 
+const ProbabilityBar = ({
+  buyProb,
+  sellProb
+}: {
+  buyProb: number;
   sellProb: number;
 }) => {
   const buyPct = Math.round(buyProb * 100);
   const sellPct = Math.round(sellProb * 100);
-  
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm">
@@ -80,7 +80,7 @@ const ProbabilityBar = ({
         <span className="font-mono font-semibold text-success">{buyPct}%</span>
       </div>
       <Progress value={buyPct} className="h-2 bg-muted/30" indicatorClassName="bg-success" />
-      
+
       <div className="flex items-center justify-between text-sm mt-4">
         <div className="flex items-center gap-2">
           <TrendingDown className="w-4 h-4 text-destructive" />
@@ -106,12 +106,15 @@ const getSkipReasonSummary = (signals: SkippedSignal[]) => {
 
 export const MLInsightsPanel = ({ prediction, skippedSignals, symbol }: MLInsightsPanelProps) => {
   const skipReasons = getSkipReasonSummary(skippedSignals);
-  
-  const signalDirection = prediction.buyProbability > prediction.sellProbability ? 'BUY' : 
-                          prediction.sellProbability > prediction.buyProbability ? 'SELL' : 'NEUTRAL';
-  
-  const signalStrength = Math.abs(prediction.buyProbability - prediction.sellProbability);
-  
+
+  const buyProb = prediction?.buyProbability ?? 0.5;
+  const sellProb = prediction?.sellProbability ?? 0.5;
+
+  const signalDirection = buyProb > sellProb ? 'BUY' :
+    sellProb > buyProb ? 'SELL' : 'NEUTRAL';
+
+  const signalStrength = Math.abs(buyProb - sellProb);
+
   return (
     <div className="glass-card p-5 animate-fade-in">
       {/* Header */}
@@ -149,7 +152,7 @@ export const MLInsightsPanel = ({ prediction, skippedSignals, symbol }: MLInsigh
 
       {/* Confidence Gauges */}
       <div className="flex justify-around mb-6">
-        <ConfidenceGauge value={prediction.confidence} label="Model Confidence" />
+        <ConfidenceGauge value={prediction?.confidence ?? 0} label="Model Confidence" />
         <ConfidenceGauge value={signalStrength} label="Signal Strength" />
       </div>
 
@@ -159,9 +162,9 @@ export const MLInsightsPanel = ({ prediction, skippedSignals, symbol }: MLInsigh
           <Target className="w-4 h-4" />
           Prediction Probabilities
         </div>
-        <ProbabilityBar 
-          buyProb={prediction.buyProbability} 
-          sellProb={prediction.sellProbability} 
+        <ProbabilityBar
+          buyProb={buyProb}
+          sellProb={sellProb}
         />
       </div>
 
@@ -200,8 +203,8 @@ export const MLInsightsPanel = ({ prediction, skippedSignals, symbol }: MLInsigh
           </div>
           <div className="space-y-2">
             {skipReasons.map(([reason, count]) => (
-              <div 
-                key={reason} 
+              <div
+                key={reason}
                 className="flex items-center justify-between text-xs bg-muted/20 rounded-lg px-3 py-2"
               >
                 <span className="text-muted-foreground truncate max-w-[200px]">{reason}</span>
