@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { createChart, ColorType, CandlestickSeries, LineSeries, LineStyle, SeriesMarkerPosition, IChartApi, ISeriesApi, Time, createSeriesMarkers } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries, LineSeries, LineStyle, HistogramSeries, SeriesMarkerPosition, IChartApi, ISeriesApi, Time, createSeriesMarkers } from 'lightweight-charts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,7 +33,14 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
   const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const lastCandleRef = useRef<CandleData | null>(null);
+  const macdContainerRef = useRef<HTMLDivElement>(null);
+  const macdChartRef = useRef<IChartApi | null>(null);
+  const macdSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const signalSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const histSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const markersPluginRef = useRef<any>(null);
+  // Add Ref for data source of truth to avoid state dependency in ticks
+  const candlesRef = useRef<CandleData[]>([]);
 
   const [timeframe, setTimeframe] = useState('1m');
   const [showIndicators, setShowIndicators] = useState({
@@ -90,6 +97,15 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
       }
     });
 
+    const macdChart = createChart(macdContainerRef.current!, {
+      ...chartOptions,
+      height: 100,
+      timeScale: {
+        ...chartOptions.timeScale,
+        visible: true,
+      }
+    });
+
     // Synchronize charts (Visible Range)
     const syncTimeScale = (source: IChartApi, target: IChartApi) => {
       source.timeScale().subscribeVisibleLogicalRangeChange((range) => {
@@ -101,14 +117,14 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     syncTimeScale(rsiChart, chart);
 
     // Synchronize Crosshair
-    const syncCrosshair = (source: IChartApi, target: IChartApi, sourceSeries: ISeriesApi<"Candlestick"> | ISeriesApi<"Line">) => {
+    const syncCrosshair = (source: IChartApi, target: IChartApi, targetSeries: ISeriesApi<"Candlestick"> | ISeriesApi<"Line">) => {
       source.subscribeCrosshairMove((param) => {
         if (!param.time || param.point === undefined) {
           target.clearCrosshairPosition();
           return;
         }
 
-        target.setCrosshairPosition(0, param.time, sourceSeries);
+        target.setCrosshairPosition(0, param.time, targetSeries);
       });
     };
 
@@ -147,18 +163,25 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     });
 
     const rsiSeries = rsiChart.addSeries(LineSeries, {
-      color: '#a855f7',
-      lineWidth: 2,
+      color: '#d946ef', // Brighter Magenta for visibility
+      lineWidth: 3, // Thicker line
       priceFormat: {
         type: 'custom',
         formatter: (price: number) => price.toFixed(0),
       },
+      // FORCE 0-100 SCALE
+      autoscaleInfoProvider: () => ({
+        priceRange: {
+          minValue: 0,
+          maxValue: 100,
+        },
+      }),
     });
 
     // Add RSI reference lines (30, 70)
     rsiSeries.createPriceLine({
       price: 70,
-      color: 'rgba(239, 68, 68, 0.5)',
+      color: 'rgba(239, 68, 68, 0.7)',
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: true,
@@ -167,12 +190,29 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
 
     rsiSeries.createPriceLine({
       price: 30,
-      color: 'rgba(34, 197, 94, 0.5)',
+      color: 'rgba(34, 197, 94, 0.7)',
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: true,
       title: '30',
     });
+
+    const macdSeries = macdChart.addSeries(LineSeries, {
+      color: '#3b82f6',
+      lineWidth: 2,
+      priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
+    }) as ISeriesApi<"Line">;
+
+    const signalSeries = macdChart.addSeries(LineSeries, {
+      color: '#ef4444',
+      lineWidth: 2,
+      priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
+    }) as ISeriesApi<"Line">;
+
+    const histSeries = macdChart.addSeries(HistogramSeries, {
+      color: '#22c55e',
+      priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
+    }) as ISeriesApi<"Histogram">;
 
     // Handle Resize
     const handleResize = () => {
@@ -182,30 +222,50 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
       if (rsiContainerRef.current) {
         rsiChart.applyOptions({ width: rsiContainerRef.current.clientWidth });
       }
+      if (macdContainerRef.current) {
+        macdChart.applyOptions({ width: macdContainerRef.current.clientWidth });
+      }
     };
 
     window.addEventListener('resize', handleResize);
 
     chartRef.current = chart;
     rsiChartRef.current = rsiChart;
+    macdChartRef.current = macdChart;
     candleSeriesRef.current = candleSeries;
     smaSeriesRef.current = smaSeries;
     emaSeriesRef.current = emaSeries;
     bbUpperSeriesRef.current = bbUpper;
     bbLowerSeriesRef.current = bbLower;
     rsiSeriesRef.current = rsiSeries;
+    macdSeriesRef.current = macdSeries;
+    signalSeriesRef.current = signalSeries;
+    histSeriesRef.current = histSeries;
 
     const markersPlugin = createSeriesMarkers(candleSeries);
     markersPluginRef.current = markersPlugin;
 
     // Synchronize Crosshair
-    syncCrosshair(chart, rsiChart, candleSeries);
-    syncCrosshair(rsiChart, chart, rsiSeries);
+    syncCrosshair(chart, rsiChart, rsiSeries);
+    syncCrosshair(chart, macdChart, macdSeries);
+    syncCrosshair(rsiChart, chart, candleSeries);
+    syncCrosshair(rsiChart, macdChart, macdSeries);
+    syncCrosshair(macdChart, chart, candleSeries);
+    syncCrosshair(macdChart, rsiChart, rsiSeries);
+
+    // Synchronize TimeScale
+    syncTimeScale(chart, rsiChart);
+    syncTimeScale(chart, macdChart);
+    syncTimeScale(rsiChart, chart);
+    syncTimeScale(rsiChart, macdChart);
+    syncTimeScale(macdChart, chart);
+    syncTimeScale(macdChart, rsiChart);
 
     return () => {
       window.removeEventListener('resize', handleResize);
       chart.remove();
       rsiChart.remove();
+      macdChart.remove();
     };
   }, []);
 
@@ -231,6 +291,8 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
           }).filter(c => !isNaN(c.time as number) && c.time > 0)
             .sort((a, b) => (a.time as number) - (b.time as number));
 
+          // Set both ref (for background processing) and state (for UI)
+          candlesRef.current = formatted;
           setCandles(formatted);
           updateChartData(formatted);
         }
@@ -244,7 +306,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     fetchCandles();
   }, [symbol, timeframe]);
 
-  // 3. Indicators Logic
+  // 3. Indicators Logic (Full calculation for initial load)
   const updateChartData = (data: any[]) => {
     if (!candleSeriesRef.current) return;
 
@@ -258,85 +320,129 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const smaPeriod = 20;
     for (let i = smaPeriod; i <= data.length; i++) {
       const slice = data.slice(i - smaPeriod, i);
-      const sum = slice.reduce((a, b) => a + b.close, 0);
+      const sum = slice.reduce((a, b) => a + (b.close || 0), 0);
       smaData.push({ time: data[i - 1].time, value: sum / smaPeriod });
     }
-    smaSeriesRef.current.setData(smaData);
+    smaSeriesRef.current?.setData(smaData);
 
     // EMA 9
     const emaData = [];
     const emaPeriod = 9;
     let k = 2 / (emaPeriod + 1);
-    let ema = data[0].close;
-    emaData.push({ time: data[0].time, value: ema });
-    for (let i = 1; i < data.length; i++) {
-      ema = data[i].close * k + ema * (1 - k);
-      emaData.push({ time: data[i].time, value: ema });
+    if (data.length > 0) {
+      let ema = data[0].close || 0;
+      emaData.push({ time: data[0].time, value: ema });
+      for (let i = 1; i < data.length; i++) {
+        ema = (data[i].close || 0) * k + ema * (1 - k);
+        emaData.push({ time: data[i].time, value: ema });
+      }
+      emaSeriesRef.current?.setData(emaData);
     }
-    emaSeriesRef.current.setData(emaData);
 
-    // RSI 14 - Wilder's Smoothing (Standard)
+    // RSI 14
     const rsiData = [];
     const rsiPeriod = 14;
 
-    if (data.length > 0) {
-      // Fill initial gap with NaN to maintain index alignment for synchronization
-      for (let i = 0; i < Math.min(data.length, rsiPeriod); i++) {
-        rsiData.push({ time: data[i].time, value: NaN });
+    if (data.length > rsiPeriod) {
+      let avgGain = 0;
+      let avgLoss = 0;
+
+      // 1. Initial SMA (First 14 periods)
+      for (let i = 1; i <= rsiPeriod; i++) {
+        const change = (data[i].close || 0) - (data[i - 1].close || 0);
+        if (change >= 0) avgGain += change;
+        else avgLoss += Math.abs(change);
+      }
+      avgGain /= rsiPeriod;
+      avgLoss /= rsiPeriod;
+
+      let rs = avgGain / (avgLoss || 0.0001);
+      let rsiValue = 100 - (100 / (1 + rs));
+
+      // Push first point
+      if (!isNaN(rsiValue)) {
+        rsiData.push({ time: data[rsiPeriod].time, value: rsiValue });
       }
 
-      if (data.length > rsiPeriod) {
-        let avgGain = 0;
-        let avgLoss = 0;
+      // 2. Wilder's Smoothing
+      for (let i = rsiPeriod + 1; i < data.length; i++) {
+        const change = (data[i].close || 0) - (data[i - 1].close || 0);
+        let currentGain = change >= 0 ? change : 0;
+        let currentLoss = change < 0 ? Math.abs(change) : 0;
 
-        // 1. Initial SMA (First 14 periods)
-        for (let i = 1; i <= rsiPeriod; i++) {
-          const change = data[i].close - data[i - 1].close;
-          if (change >= 0) avgGain += change;
-          else avgLoss += Math.abs(change);
-        }
-        avgGain /= rsiPeriod;
-        avgLoss /= rsiPeriod;
+        avgGain = ((avgGain * 13) + currentGain) / 14;
+        avgLoss = ((avgLoss * 13) + currentLoss) / 14;
 
-        let rs = avgGain / (avgLoss || 0.0001);
-        let rsi = 100 - (100 / (1 + rs));
+        rs = avgGain / (avgLoss || 0.0001);
+        rsiValue = 100 - (100 / (1 + rs));
 
-        // Push the first calculated point matching index 'rsiPeriod'
-        rsiData.push({ time: data[rsiPeriod].time, value: rsi });
-
-        // 2. Wilder's Smoothing
-        for (let i = rsiPeriod + 1; i < data.length; i++) {
-          const change = data[i].close - data[i - 1].close;
-          let currentGain = 0;
-          let currentLoss = 0;
-
-          if (change >= 0) currentGain = change;
-          else currentLoss = Math.abs(change);
-
-          avgGain = ((avgGain * 13) + currentGain) / 14;
-          avgLoss = ((avgLoss * 13) + currentLoss) / 14;
-
-          rs = avgGain / (avgLoss || 0.0001);
-          rsi = 100 - (100 / (1 + rs));
-          rsiData.push({ time: data[i].time, value: rsi });
+        if (!isNaN(rsiValue)) {
+          rsiData.push({ time: data[i].time, value: rsiValue });
         }
       }
     }
-    rsiSeriesRef.current.setData(rsiData);
+    // No NaN padding - start from where we have data
+    rsiSeriesRef.current?.setData(rsiData);
 
     // Bollinger Bands
     const upperData = [];
     const lowerData = [];
     for (let i = smaPeriod; i <= data.length; i++) {
       const slice = data.slice(i - smaPeriod, i);
-      const mean = slice.reduce((sum, c) => sum + c.close, 0) / smaPeriod;
-      const variance = slice.reduce((sum, c) => sum + Math.pow(c.close - mean, 2), 0) / smaPeriod;
+      const mean = slice.reduce((sum, c) => sum + (c.close || 0), 0) / smaPeriod;
+      const variance = slice.reduce((sum, c) => sum + Math.pow((c.close || 0) - mean, 2), 0) / smaPeriod;
       const stdDev = Math.sqrt(variance);
       upperData.push({ time: data[i - 1].time, value: mean + (stdDev * 2) });
       lowerData.push({ time: data[i - 1].time, value: mean - (stdDev * 2) });
     }
-    bbUpperSeriesRef.current.setData(upperData);
-    bbLowerSeriesRef.current.setData(lowerData);
+    bbUpperSeriesRef.current?.setData(upperData);
+    bbLowerSeriesRef.current?.setData(lowerData);
+
+    // MACD (12, 26, 9)
+    if (data.length > 26) {
+      const fastPeriod = 12;
+      const slowPeriod = 26;
+      const signalPeriod = 9;
+
+      const fastK = 2 / (fastPeriod + 1);
+      const slowK = 2 / (slowPeriod + 1);
+      const signalK = 2 / (signalPeriod + 1);
+
+      let fastEMA = data[0].close;
+      let slowEMA = data[0].close;
+      const macdLine = [];
+
+      for (let i = 1; i < data.length; i++) {
+        fastEMA = data[i].close * fastK + fastEMA * (1 - fastK);
+        slowEMA = data[i].close * slowK + slowEMA * (1 - slowK);
+        if (i >= slowPeriod - 1) {
+          macdLine.push({ time: data[i].time, value: fastEMA - slowEMA });
+        }
+      }
+
+      const signalLine = [];
+      const histData = [];
+      if (macdLine.length > 0) {
+        let signalEMA = macdLine[0].value;
+        signalLine.push({ time: macdLine[0].time, value: signalEMA });
+        histData.push({ time: macdLine[0].time, value: 0, color: '#22c55e' });
+
+        for (let i = 1; i < macdLine.length; i++) {
+          signalEMA = macdLine[i].value * signalK + signalEMA * (1 - signalK);
+          signalLine.push({ time: macdLine[i].time, value: signalEMA });
+          const hist = macdLine[i].value - signalEMA;
+          histData.push({
+            time: macdLine[i].time,
+            value: hist,
+            color: hist >= 0 ? '#22c55e' : '#ef4444'
+          });
+        }
+      }
+
+      macdSeriesRef.current?.setData(macdLine);
+      signalSeriesRef.current?.setData(signalLine);
+      histSeriesRef.current?.setData(histData);
+    }
 
     // Trade Markers
     const markers = positions
@@ -354,7 +460,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     }
   };
 
-  // 4. Real-time Ticks - Update candles AND indicators
+  // 4. Real-time Ticks
   useEffect(() => {
     if (ticks.length === 0 || !candleSeriesRef.current) return;
     const lastTick = ticks[0];
@@ -365,17 +471,32 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const granularity = granMap[timeframe] || 60;
     const currentSymbolTime = (Math.floor(tickTime / granularity) * granularity) as Time;
 
+    // Guard: Prevent "back in time"
+    if (lastCandleRef.current && (currentSymbolTime as number) < (lastCandleRef.current.time as number)) {
+      return;
+    }
+
     let updatedCandle: CandleData;
     let isNewCandle = false;
 
-    if (lastCandleRef.current && (lastCandleRef.current.time === currentSymbolTime)) {
+    // Use Refs
+    const currentCandles = [...candlesRef.current];
+    const lastCandle = lastCandleRef.current;
+
+    if (lastCandle && (lastCandle.time === currentSymbolTime)) {
+      // Update existing candle
       updatedCandle = {
-        ...lastCandleRef.current,
-        high: Math.max(lastCandleRef.current.high, lastTick.bid),
-        low: Math.min(lastCandleRef.current.low, lastTick.bid),
+        ...lastCandle,
+        high: Math.max(lastCandle.high, lastTick.bid),
+        low: Math.min(lastCandle.low, lastTick.bid),
         close: lastTick.bid,
       };
+
+      if (currentCandles.length > 0) {
+        currentCandles[currentCandles.length - 1] = updatedCandle;
+      }
     } else {
+      // New candle
       updatedCandle = {
         time: currentSymbolTime as any,
         open: lastTick.bid,
@@ -384,110 +505,125 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
         close: lastTick.bid,
       };
       isNewCandle = true;
+      currentCandles.push(updatedCandle);
     }
 
+    // Limit to 500
+    const truncatedCandles = currentCandles.length > 500 ? currentCandles.slice(-500) : currentCandles;
+
+    // Update Refs
+    candlesRef.current = truncatedCandles;
     lastCandleRef.current = updatedCandle;
+
+    // Direct Chart Update (Fast)
     candleSeriesRef.current.update(updatedCandle);
 
-    // Update candles state for indicator calculation
-    setCandles(prevCandles => {
-      let newCandles: CandleData[];
-      if (isNewCandle) {
-        newCandles = [...prevCandles, updatedCandle];
-      } else {
-        // Update the last candle
-        newCandles = [...prevCandles];
-        if (newCandles.length > 0) {
-          newCandles[newCandles.length - 1] = updatedCandle;
-        } else {
-          newCandles = [updatedCandle];
+    // Indicators Update
+    const data = truncatedCandles;
+    if (data.length >= 20) {
+      // SMA 20
+      const smaPeriod = 20;
+      const smaSlice = data.slice(-smaPeriod);
+      const smaValue = smaSlice.reduce((a, b) => a + (b.close || 0), 0) / smaPeriod;
+      smaSeriesRef.current?.update({ time: data[data.length - 1].time, value: smaValue });
+
+      // BB
+      const mean = smaValue;
+      const variance = smaSlice.reduce((sum, c) => sum + Math.pow((c.close || 0) - mean, 2), 0) / smaPeriod;
+      const stdDev = Math.sqrt(variance);
+      bbUpperSeriesRef.current?.update({ time: data[data.length - 1].time, value: mean + (stdDev * 2) });
+      bbLowerSeriesRef.current?.update({ time: data[data.length - 1].time, value: mean - (stdDev * 2) });
+
+      // EMA 9
+      if (emaSeriesRef.current) {
+        const emaPeriod = 9;
+        let k = 2 / (emaPeriod + 1);
+        let ema = data[0].close || 0;
+        for (let i = 1; i < data.length; i++) {
+          ema = (data[i].close || 0) * k + ema * (1 - k);
         }
+        emaSeriesRef.current.update({ time: data[data.length - 1].time, value: ema });
       }
+    }
 
-      // Limit to 500 candles to prevent memory issues
-      if (newCandles.length > 500) {
-        newCandles = newCandles.slice(-500);
-      }
-
-      // Update indicators with new data
-      const data = newCandles;
-      if (data.length >= 20) {
-        // SMA 20 - update last point
-        const smaPeriod = 20;
-        const smaSlice = data.slice(-smaPeriod);
-        const smaValue = smaSlice.reduce((a, b) => a + b.close, 0) / smaPeriod;
-        smaSeriesRef.current?.update({ time: data[data.length - 1].time, value: smaValue });
-
-        // EMA 9 - incremental update
-        if (emaSeriesRef.current && data.length > 0) {
-          const emaPeriod = 9;
-          const k = 2 / (emaPeriod + 1);
-          // Get previous EMA or calculate from scratch
-          let ema = data[0].close;
-          for (let i = 1; i < data.length; i++) {
-            ema = data[i].close * k + ema * (1 - k);
-          }
-          emaSeriesRef.current.update({ time: data[data.length - 1].time, value: ema });
-        }
-
-        // Bollinger Bands - update last point
-        const bbSlice = data.slice(-smaPeriod);
-        const mean = bbSlice.reduce((sum, c) => sum + c.close, 0) / smaPeriod;
-        const variance = bbSlice.reduce((sum, c) => sum + Math.pow(c.close - mean, 2), 0) / smaPeriod;
-        const stdDev = Math.sqrt(variance);
-        bbUpperSeriesRef.current?.update({ time: data[data.length - 1].time, value: mean + (stdDev * 2) });
-        bbLowerSeriesRef.current?.update({ time: data[data.length - 1].time, value: mean - (stdDev * 2) });
-      }
-
-      // RSI 14 - update last point
-      // RSI 14 - Recalculate full series for accuracy (Wilder's Smoothing)
-      // Recalculating 500 points is negligible and ensures consistency with TradingView
+    // RSI 14
+    if (data.length > 14 && rsiSeriesRef.current) {
       const rsiPeriod = 14;
-      const rsiData = [];
+      let avgGain = 0;
+      let avgLoss = 0;
 
-      if (data.length > rsiPeriod) {
-        let avgGain = 0;
-        let avgLoss = 0;
+      for (let i = 1; i <= rsiPeriod; i++) {
+        const change = (data[i].close || 0) - (data[i - 1].close || 0);
+        if (change >= 0) avgGain += change;
+        else avgLoss += Math.abs(change);
+      }
+      avgGain /= rsiPeriod;
+      avgLoss /= rsiPeriod;
 
-        // 1. Initial SMA (First 14 periods)
-        for (let i = 1; i <= rsiPeriod; i++) {
-          const change = data[i].close - data[i - 1].close;
-          if (change >= 0) avgGain += change;
-          else avgLoss += Math.abs(change);
+      let rsiVal = 0;
+      for (let i = rsiPeriod; i < data.length; i++) {
+        if (i === rsiPeriod) {
+          const rs = avgGain / (avgLoss || 0.0001);
+          rsiVal = 100 - (100 / (1 + rs));
+        } else {
+          const change = (data[i].close || 0) - (data[i - 1].close || 0);
+          let cGain = change >= 0 ? change : 0;
+          let cLoss = change < 0 ? Math.abs(change) : 0;
+          avgGain = ((avgGain * 13) + cGain) / 14;
+          avgLoss = ((avgLoss * 13) + cLoss) / 14;
+          const rs = avgGain / (avgLoss || 0.0001);
+          rsiVal = 100 - (100 / (1 + rs));
         }
-        avgGain /= rsiPeriod;
-        avgLoss /= rsiPeriod;
-
-        // Push first RSI point
-        let rs = avgGain / (avgLoss || 0.0001);
-        let rsi = 100 - (100 / (1 + rs));
-        // correlate time with the end of the period
-        rsiData.push({ time: data[rsiPeriod].time, value: rsi });
-
-        // 2. Wilder's Smoothing (Subsequent periods)
-        for (let i = rsiPeriod + 1; i < data.length; i++) {
-          const change = data[i].close - data[i - 1].close;
-          let currentGain = 0;
-          let currentLoss = 0;
-
-          if (change >= 0) currentGain = change;
-          else currentLoss = Math.abs(change);
-
-          avgGain = ((avgGain * 13) + currentGain) / 14;
-          avgLoss = ((avgLoss * 13) + currentLoss) / 14;
-
-          rs = avgGain / (avgLoss || 0.0001);
-          rsi = 100 - (100 / (1 + rs));
-          rsiData.push({ time: data[i].time, value: rsi });
-        }
-
-        // Update the RSI series
-        // Using setData prevents artifacts from partial updates and ensures the whole line is correct
-        rsiSeriesRef.current?.setData(rsiData);
       }
 
-      return newCandles;
-    });
+      if (!isNaN(rsiVal)) {
+        rsiSeriesRef.current.update({ time: data[data.length - 1].time, value: rsiVal });
+      }
+    }
+
+    // MACD 12, 26, 9
+    if (data.length > 26 && macdSeriesRef.current) {
+      const fastPeriod = 12;
+      const slowPeriod = 26;
+      const signalPeriod = 9;
+
+      const fastK = 2 / (fastPeriod + 1);
+      const slowK = 2 / (slowPeriod + 1);
+      const signalK = 2 / (signalPeriod + 1);
+
+      let fastEMA = data[0].close;
+      let slowEMA = data[0].close;
+      const macdValues = [];
+
+      for (let i = 1; i < data.length; i++) {
+        fastEMA = (data[i].close || 0) * fastK + fastEMA * (1 - fastK);
+        slowEMA = (data[i].close || 0) * slowK + slowEMA * (1 - slowK);
+        if (i >= slowPeriod - 1) {
+          macdValues.push(fastEMA - slowEMA);
+        }
+      }
+
+      if (macdValues.length > 0) {
+        let signalEMA = macdValues[0];
+        for (let i = 1; i < macdValues.length; i++) {
+          signalEMA = macdValues[i] * signalK + signalEMA * (1 - signalK);
+        }
+
+        const currentMACD = macdValues[macdValues.length - 1];
+        const currentHist = currentMACD - signalEMA;
+
+        macdSeriesRef.current.update({ time: data[data.length - 1].time, value: currentMACD });
+        signalSeriesRef.current?.update({ time: data[data.length - 1].time, value: signalEMA });
+        histSeriesRef.current?.update({
+          time: data[data.length - 1].time,
+          value: currentHist,
+          color: currentHist >= 0 ? '#22c55e' : '#ef4444'
+        });
+      }
+    }
+
+    // Update React State
+    setCandles(truncatedCandles);
   }, [ticks, symbol, timeframe]);
 
   // 5. Toggle Indicators
@@ -587,6 +723,8 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
         <div ref={chartContainerRef} className="w-full" style={{ height: '300px' }} />
         <div className="border-t border-white/5 mt-1" />
         <div ref={rsiContainerRef} className="w-full" style={{ height: '100px' }} />
+        <div className="border-t border-white/5 mt-1" />
+        <div ref={macdContainerRef} className="w-full" style={{ height: '100px' }} />
       </CardContent>
     </Card>
   );

@@ -112,17 +112,21 @@ class StrategyManager:
             # Global BLOCK Rules
             if market_mode == "chaotic":
                 logger.debug(f"MasterEngine Block: Chaotic Market ({symbol})")
-                return None
+                return {"action": None, "reason": "Chaotic Market"}
                 
             if noise_detected:
                 logger.debug(f"MasterEngine Block: Noise Detected ({symbol})")
-                return None
+                return {"action": None, "reason": "Noise Detected"}
             
             # DEBUG: Heartbeat
             # logger.info(f"Evaluating {symbol} with {strategy_name}")
 
             # If strategy produced a signal, validate and enrich it
             if signal:
+                # If strategy already decided to skip with a reason, pass it through
+                if signal.get("action") is None:
+                    return signal
+                    
                 logger.info(f"DEBUG: Strategy for {symbol} produced raw signal: {signal}")
                 
                 # Calculate V2 Confidence
@@ -146,7 +150,7 @@ class StrategyManager:
                 # Confidence Cutoff (Relaxed for Scalping)
                 if v2_confidence < 15: 
                     logger.warning(f"DEBUG: Signal BLOCKED by Confidence! {v2_confidence} < 15")
-                    return None
+                    return {"action": None, "reason": f"Low Confidence ({v2_confidence:.1f}%)"}
 
                 # Update/Enrich Signal
                 signal["confidence"] = v2_confidence

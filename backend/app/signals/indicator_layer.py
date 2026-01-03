@@ -375,53 +375,65 @@ class IndicatorLayer:
         elif timeframe == "1h":
             self.rsi_history_1h.append(rsi_value)
     
-    def get_rsi_1m_momentum(self) -> dict:
+    def get_rsi_1m_momentum(self, current_rsi: float = None) -> dict:
         """
         RSI(1m) Momentum Direction based on slope.
+        If current_rsi is provided, compares it to the last closed candle in history.
         
         Returns:
             dict with momentum_up, momentum_down, and slope_value
         """
-        if len(self.rsi_history_1m) < 2:
-            # Fallback to legacy rsi_history if 1m not populated
-            if len(self.rsi_history) < 2:
-                return {"momentum_up": False, "momentum_down": False, "slope_value": 0.0}
-            current_rsi = self.rsi_history[-1]
-            previous_rsi = self.rsi_history[-2]
+        if current_rsi is None:
+            if len(self.rsi_history_1m) < 2:
+                # Fallback to legacy rsi_history if 1m not populated
+                if len(self.rsi_history) < 2:
+                    return {"momentum_up": False, "momentum_down": False, "slope_value": 0.0}
+                current_rsi = self.rsi_history[-1]
+                previous_rsi = self.rsi_history[-2]
+            else:
+                current_rsi = self.rsi_history_1m[-1]
+                previous_rsi = self.rsi_history_1m[-2]
         else:
-            current_rsi = self.rsi_history_1m[-1]
-            previous_rsi = self.rsi_history_1m[-2]
+            if len(self.rsi_history_1m) < 1:
+                return {"momentum_up": False, "momentum_down": False, "slope_value": 0.0}
+            previous_rsi = self.rsi_history_1m[-1] # Compare to last closed candle
         
         slope_value = current_rsi - previous_rsi
         
         return {
-            "momentum_up": current_rsi > previous_rsi,
-            "momentum_down": current_rsi < previous_rsi,
+            "momentum_up": slope_value > 0.1, # Small threshold for meaningful momentum
+            "momentum_down": slope_value < -0.1,
             "slope_value": slope_value
         }
     
-    def get_rsi_1m_volatility(self) -> dict:
+    def get_rsi_1m_volatility(self, current_rsi: float = None) -> dict:
         """
         RSI(1m) Volatility State.
+        If current_rsi is provided, compares it to the last closed candle.
         
         Returns:
-            - state: "flat" if < 2, "normal" if 2-5, "expanding" if > 5
+            - state: "flat" if < 0.5, "normal" if 0.5-5, "expanding" if > 5
             - volatility_value: absolute difference
             - confidence_modifier: adjustment for confidence scoring
         """
-        if len(self.rsi_history_1m) < 2:
-            # Fallback to legacy rsi_history
-            if len(self.rsi_history) < 2:
-                return {"state": "flat", "volatility_value": 0.0, "confidence_modifier": -0.1}
-            current_rsi = self.rsi_history[-1]
-            previous_rsi = self.rsi_history[-2]
+        if current_rsi is None:
+            if len(self.rsi_history_1m) < 2:
+                # Fallback to legacy rsi_history
+                if len(self.rsi_history) < 2:
+                    return {"state": "flat", "volatility_value": 0.0, "confidence_modifier": -0.1}
+                current_rsi = self.rsi_history[-1]
+                previous_rsi = self.rsi_history[-2]
+            else:
+                current_rsi = self.rsi_history_1m[-1]
+                previous_rsi = self.rsi_history_1m[-2]
         else:
-            current_rsi = self.rsi_history_1m[-1]
-            previous_rsi = self.rsi_history_1m[-2]
+            if len(self.rsi_history_1m) < 1:
+                return {"state": "flat", "volatility_value": 0.0, "confidence_modifier": -0.1}
+            previous_rsi = self.rsi_history_1m[-1]
         
         rsi_volatility = abs(current_rsi - previous_rsi)
         
-        if rsi_volatility < 2:
+        if rsi_volatility < 0.5:
             state = "flat"
             confidence_modifier = -0.1  # Reduce confidence, avoid entries
         elif rsi_volatility <= 5:
@@ -502,27 +514,22 @@ class IndicatorLayer:
         1. L1 (Strict): RSI(1m) Flow & Momentum must align with direction.
         2. L2 (Strict): RSI(5m) Flow must align with direction (Short-term trend).
         3. L3 (Soft): RSI(15m) & RSI(1h) are directional biases. 
-           If they align -> Confidence Boost.
-           If they disagree -> No hard block, but Confidence Penalty.
-           
-        Args:
-            direction: Optional "BUY" or "SELL" to check against.
         
-        Returns:
-            dict with allow_buy, allow_sell, and detailed breakdown
+        Note: Now compares current tick RSI to last closed candle history.
         """
-        # Get 1m signals (ENTRY TRIGGER)
-        momentum_1m = self.get_rsi_1m_momentum()
-        volatility_1m = self.get_rsi_1m_volatility()
-        
-        if len(self.rsi_history_1m) > 0:
-            rsi_1m_value = self.rsi_history_1m[-1]
-        elif len(self.rsi_history) > 0:
-            rsi_1m_value = self.rsi_history[-1]
+        # Determine current RSI (Real-time)
+        if len(self.rsi_history) > 0:
+            rsi_now = self.rsi_history[-1]
+        elif len(self.rsi_history_1m) > 0:
+            rsi_now = self.rsi_history_1m[-1]
         else:
-            rsi_1m_value = 50.0
+            rsi_now = 50.0
+
+        # Get 1m signals (ENTRY TRIGGER) using real-time tick vs history model
+        momentum_1m = self.get_rsi_1m_momentum(current_rsi=rsi_now)
+        volatility_1m = self.get_rsi_1m_volatility(current_rsi=rsi_now)
         
-        flow_1m = "bullish" if rsi_1m_value > 50 else ("bearish" if rsi_1m_value < 50 else "neutral")
+        flow_1m = "bullish" if rsi_now > 50 else ("bearish" if rsi_now < 50 else "neutral")
         
         # Get higher timeframe filters
         flow_5m = self.get_rsi_5m_flow()
@@ -550,16 +557,17 @@ class IndicatorLayer:
         # --- Hierarchical Approval ---
         
         # BUY: (1m Bullish + 1m Mom Up + 1m Not Flat) AND (5m Bullish)
-        allow_buy = (flow_1m == "bullish" and momentum_1m["momentum_up"] and 
+        # We allow a very small 'sideways' RSI if it's already deep in bullish territory (>55)
+        allow_buy = (flow_1m == "bullish" and (momentum_1m["momentum_up"] or rsi_now > 55) and 
                      volatility_1m["state"] != "flat" and flow_5m == "bullish")
         
         # SELL: (1m Bearish + 1m Mom Down + 1m Not Flat) AND (5m Bearish)
-        allow_sell = (flow_1m == "bearish" and momentum_1m["momentum_down"] and 
+        allow_sell = (flow_1m == "bearish" and (momentum_1m["momentum_down"] or rsi_now < 45) and 
                       volatility_1m["state"] != "flat" and flow_5m == "bearish")
         
         # Build summary
         summary = (
-            f"MTF-RSI(H) | 1m={rsi_1m_value:.1f} "
+            f"MTF-RSI(H) | Now={rsi_now:.1f} "
             f"Mom={'↑' if momentum_1m['momentum_up'] else ('↓' if momentum_1m['momentum_down'] else '→')} | "
             f"5m={flow_5m} | 15m={trend_15m} | 1h={macro_1h}"
         )
@@ -574,7 +582,7 @@ class IndicatorLayer:
         result = {
             "allow_buy": allow_buy,
             "allow_sell": allow_sell,
-            "rsi_1m_value": rsi_1m_value,
+            "rsi_1m_value": rsi_now,
             "slope_value": momentum_1m["slope_value"],
             "flow_1m": flow_1m,
             "flow_5m": flow_5m,

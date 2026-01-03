@@ -127,10 +127,10 @@ class V10SuperSafeStrategy(BaseStrategy):
         mtf_trend = mtf_data.get("trend", "neutral")
         
         if noise_detected:
-             return None
+             return {"action": None, "reason": "Noise Peaks Detected"}
              
         if market_mode == "chaotic":
-             return None
+             return {"action": None, "reason": "Market Chaos Detected"}
         
         # === ADAPTIVE THRESHOLDS ===
         # Dynamically loosen or tighten based on market mode
@@ -139,16 +139,19 @@ class V10SuperSafeStrategy(BaseStrategy):
         
         # === FILTER 2: Trend Validation (ENABLED) ===
         if abs(ma_slope) < self.config["sideways_slope_threshold"]:
-            logger.info(f"[V10] Trade rejected: Sideways market (Slope: {ma_slope:.6f}, RSI: {rsi:.1f})")
-            return None
+            reason = f"Sideways Market ({ma_slope:.6f})"
+            logger.info(f"[V10] Trade rejected: {reason}")
+            return {"action": None, "reason": reason}
             
         if adx < self.config["adx_threshold"]:
-            logger.info(f"[V10] Trade rejected: Weak trend (ADX: {adx:.1f})")
-            return None
+            reason = f"Weak Trend (ADX: {adx:.1f})"
+            logger.info(f"[V10] Trade rejected: {reason}")
+            return {"action": None, "reason": reason}
             
         if abs(ma_slope) < self.config["min_ma_slope"]:
-            logger.info(f"[V10] Trade rejected: MA slope too flat ({ma_slope:.5f})")
-            return None
+            reason = f"Flat MA Slope ({ma_slope:.5f})"
+            logger.info(f"[V10] Trade rejected: {reason}")
+            return {"action": None, "reason": reason}
         
         # === FILTER 3: Candle Quality ===
         # if self.config["reject_wick_spikes"] and candle_range > 0:
@@ -176,8 +179,9 @@ class V10SuperSafeStrategy(BaseStrategy):
                 rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("BUY")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_buy", True):
-                logger.info(f"[V10] BUY rejected by MTF-RSI: {rsi_hybrid.get('summary')}")
-                return None
+                reason = f"MTF-RSI Buy Block: {rsi_hybrid.get('summary')}"
+                logger.info(f"[V10] {reason}")
+                return {"action": None, "reason": reason}
             
             # --- ULTRA-FAST ENTRY FILTER ---
             current_candle = candles_1m[-1] if candles_1m else None
@@ -188,8 +192,9 @@ class V10SuperSafeStrategy(BaseStrategy):
                     rsi_momentum_up=rsi_hybrid.get("momentum_up") if rsi_hybrid else None
                 )
                 if not fast_filter["allow_entry"]:
-                    logger.info(f"[V10] BUY rejected by UltraFastFilter: {fast_filter['reason']}")
-                    return None
+                    reason = f"UltraFast BUY Block: {fast_filter['reason']}"
+                    logger.info(f"[V10] {reason}")
+                    return {"action": None, "reason": reason}
             
             # All conditions met for BUY
             conf_data = {
@@ -209,8 +214,9 @@ class V10SuperSafeStrategy(BaseStrategy):
             smart_confidence += mtf_penalty
             
             if smart_confidence < conf_threshold:
-               logger.info(f"[V10] BUY rejected: Low confidence ({smart_confidence:.1f} < {conf_threshold})")
-               return None
+               reason = f"Low Confidence ({smart_confidence:.1f} < {conf_threshold})"
+               logger.info(f"[V10] BUY rejected: {reason}")
+               return {"action": None, "reason": reason}
             
             # --- Dynamic SL/TP Calculation ---
             # Calculate ATR(14) from 1m candles for accurate sizing
@@ -269,8 +275,9 @@ class V10SuperSafeStrategy(BaseStrategy):
                 rsi_hybrid = engine.indicator_layer.get_multi_rsi_confirmation("SELL")
             
             if rsi_hybrid and not rsi_hybrid.get("allow_sell", True):
-                logger.info(f"[V10] SELL rejected by MTF-RSI: {rsi_hybrid.get('summary')}")
-                return None
+                reason = f"MTF-RSI Sell Block: {rsi_hybrid.get('summary')}"
+                logger.info(f"[V10] {reason}")
+                return {"action": None, "reason": reason}
                 
             # --- ULTRA-FAST ENTRY FILTER ---
             current_candle = candles_1m[-1] if candles_1m else None
@@ -281,8 +288,9 @@ class V10SuperSafeStrategy(BaseStrategy):
                     rsi_momentum_down=rsi_hybrid.get("momentum_down") if rsi_hybrid else None
                 )
                 if not fast_filter["allow_entry"]:
-                    logger.info(f"[V10] SELL rejected by UltraFastFilter: {fast_filter['reason']}")
-                    return None
+                    reason = f"UltraFast SELL Block: {fast_filter['reason']}"
+                    logger.info(f"[V10] {reason}")
+                    return {"action": None, "reason": reason}
             
             # All conditions met for SELL
             conf_data = {
@@ -302,8 +310,9 @@ class V10SuperSafeStrategy(BaseStrategy):
             smart_confidence += mtf_penalty
             
             if smart_confidence < conf_threshold:
-                logger.info(f"[V10] SELL rejected: Low confidence ({smart_confidence:.1f} < {conf_threshold})")
-                return None
+                reason = f"Low Confidence ({smart_confidence:.1f} < {conf_threshold})"
+                logger.info(f"[V10] SELL rejected: {reason}")
+                return {"action": None, "reason": reason}
                 
             # --- Dynamic SL/TP Calculation (SELL) ---
             import numpy as np

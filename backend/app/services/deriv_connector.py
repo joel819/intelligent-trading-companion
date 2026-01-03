@@ -33,6 +33,8 @@ class SymbolProcessor:
         self.entry_validator = EntryValidator()
         self.strategy_manager = StrategyManager()
         self.strategy_manager.select_strategy_by_symbol(symbol)
+        self.tick_count = 0
+        self.candle_counts = {"1m": 0, "5m": 0, "15m": 0, "1h": 0}
         
         # Apply config if provided
         if config and hasattr(self.indicator_layer, 'update_params'):
@@ -40,15 +42,13 @@ class SymbolProcessor:
                 rsi_oversold = config.get("rsi_oversold"),
                 rsi_overbought = config.get("rsi_overbought")
             )
-            
+        
         # Link for RSI Hybrid Mode
         self.engine.indicator_layer = self.indicator_layer
         
         # Exits
         self.smart_sl = SmartStopLoss()
         self.dynamic_tp = DynamicTakeProfit()
-        self.scalper_exit = ScalperExitModule()
-        self.scalper_tpsl = ScalperTPSL()
 
 # Deriv API Endpoint
 DERIV_WS_BASE_URL = "wss://ws.derivws.com/websockets/v3"
@@ -142,6 +142,7 @@ class DerivConnector:
             "max_daily_loss": 5.0,
             "max_sl_hits": 3
         }
+        self.last_skipped_data = {}
         
         # Apply initial config
         self.apply_config_updates(self.default_config)
@@ -559,35 +560,48 @@ class DerivConnector:
         # Monitor positions
         await self.monitor_positions_for_sl_tp(float(bid), symbol)
         
-        # Only process enabled symbols
-        if symbol not in self.enabled_symbols:
-            return
-            
-        # Get Processor
+        # Get Processor (Universal: We process ALL symbols for ML Insights)
         if symbol not in self.processors:
              self.processors[symbol] = SymbolProcessor(symbol, self.default_config)
         
         p = self.processors[symbol]
+        p.tick_count += 1
 
-        self.tick_count += 1 # Global tick count
+        # 1. Update Engine (Universal)
+        p.engine.update_tick(symbol, float(bid), epoch)
+
+        # 2. Synchronize MTF Indicators (Only on candle close to preserve momentum slope)
+        current_counts = {
+            "1m": len(p.engine.candles_1m),
+            "5m": len(p.engine.candles_5m),
+            "15m": len(p.engine.candles_15m),
+            "1h": len(p.engine.candles_1h)
+        }
+        
+        for tf, count in current_counts.items():
+            if count > p.candle_counts[tf]:
+                rsi_val = p.engine.get_momentum(tf)
+                p.indicator_layer.update_rsi_timeframe(tf, rsi_val)
+                p.candle_counts[tf] = count
+
+        # 3. Analyze Indicators (Universal for ML Predictions)
+        tick_for_algo = {
+            "symbol": symbol,
+            "quote": float(bid),
+            "high": float(tick.get('ask', bid)),
+            "low": float(tick.get('bid', bid)),
+            "open": float(bid),
+            "epoch": epoch
+        }
+        indicator_data = p.indicator_layer.analyze(tick_for_algo, engine=p.engine)
+        structure_data = p.market_structure.analyze(tick_for_algo)
+
+        # Only process trading logic for enabled symbols
+        if symbol not in self.enabled_symbols:
+            return
 
         try:
-            # 1. Update Engine
-            tick_for_algo = {
-                "symbol": symbol,
-                "quote": float(bid),
-                "high": float(tick.get('ask', bid)),
-                "low": float(tick.get('bid', bid)),
-                "open": float(bid),
-                "epoch": epoch
-            }
-            p.engine.update_tick(symbol, float(bid), epoch)
-            
-            # 2. Analyze Indicators
-            indicator_data = p.indicator_layer.analyze(tick_for_algo, engine=p.engine)
-            structure_data = p.market_structure.analyze(tick_for_algo)
-            
-            # 3. Strategy Analysis
+            # 4. Strategy Analysis
             candles_1m_list = list(p.engine.candles_1m)
             market_mode = p.engine.detect_market_mode(candles_1m_list)
             
@@ -605,12 +619,31 @@ class DerivConnector:
             final_confidence = strategy_signal.get('confidence', 0) if strategy_signal else 0
             volatility_state = p.engine.get_volatility("1m")
             
+            # Broadcast Skip if reason provided (Optimized: Throttled)
+            if strategy_signal and not action and strategy_signal.get('reason'):
+                now = time.time()
+                last_data = self.last_skipped_data.get(symbol, {"reason": "", "timestamp": 0})
+                
+                # Only broadcast if reason changed OR 10 seconds passed
+                if strategy_signal['reason'] != last_data['reason'] or (now - last_data['timestamp']) > 10.0:
+                    await stream_manager.broadcast_skipped_signal({
+                        "tick_count": p.tick_count,
+                        "reason": strategy_signal['reason'],
+                        "symbol": symbol,
+                        "atr": p.engine.get_atr("1m"),
+                        "confidence": final_confidence,
+                        "regime": market_mode,
+                        "volatility": volatility_state,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    self.last_skipped_data[symbol] = {"reason": strategy_signal['reason'], "timestamp": now}
+            
             if action:
                 # 1. Cooldown Check
                 if not self.cooldown_manager.can_trade():
                     logger.warning(f"[SIGNAL SKIPPED] {symbol}: Cooldown Active")
                     await stream_manager.broadcast_skipped_signal({
-                        "tick_count": self.tick_count,
+                        "tick_count": p.tick_count,
                         "reason": "Cooldown Active",
                         "symbol": symbol,
                         "atr": 0, # Not relevant for cooldown
@@ -634,10 +667,10 @@ class DerivConnector:
                 if not is_safe:
                     logger.warning(f"[SIGNAL SKIPPED] {symbol}: Risk Guard Blocked: {guard_msg}")
                     await stream_manager.broadcast_skipped_signal({
-                        "tick_count": self.tick_count,
+                        "tick_count": p.tick_count,
                         "reason": f"Risk Guard: {guard_msg}",
                         "symbol": symbol,
-                        "atr": p.engine.get_volatility("1m"), # Simple proxy
+                        "atr": p.engine.get_atr("1m"),
                         "confidence": final_confidence,
                         "regime": market_mode,
                         "volatility": volatility_state,
@@ -715,16 +748,31 @@ class DerivConnector:
             result = json.loads(execution_result_json)
             
             if result.get("status") != "approved":
-                logger.warning(f"C++ Engine Blocked {symbol} {action}: {result.get('reason')}")
+                reason = result.get('reason', 'C++ Engine Blocked')
+                logger.warning(f"C++ Engine Blocked {symbol} {action}: {reason}")
+                
+                # Broadcast for UI transparency
+                await stream_manager.broadcast_skipped_signal({
+                    "tick_count": p.tick_count if p else 0,
+                    "reason": f"Safety Layer: {reason}",
+                    "symbol": symbol,
+                    "atr": p.engine.get_atr("1m") if p else 0,
+                    "confidence": confidence,
+                    "regime": market_mode,
+                    "volatility": "N/A",
+                    "timestamp": datetime.now().isoformat()
+                })
                 return
 
-            # 2. Metadata for tracking
+            # 2. metadata for tracking & isolation
             metadata = {
                 "strategy": strategy_info.get("name", "V10_V75_Scalper"),
                 "regime": market_mode,
                 "confidence": confidence,
                 "stop_loss": sl,
-                "take_profit": tp
+                "take_profit": tp,
+                "scalper_exit": ScalperExitModule(),
+                "scalper_tpsl": ScalperTPSL()
             }
             
             # 3. Placement
@@ -739,21 +787,28 @@ class DerivConnector:
             # Record cooldown after successful execution
             self.cooldown_manager.record_trade()
             
-            # Activate Scalper Exit Monitoring for this symbol
-            if symbol in self.processors:
+            # Activate Scalper Monitors for this specific trade
+            if buy_resp and 'buy' in buy_resp and symbol in self.processors:
                 p = self.processors[symbol]
                 volatility_state = p.engine.get_volatility("1m")
-                p.scalper_exit.activate(
-                    trade_direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
-                    initial_volatility_state=volatility_state
-                )
-                # Initialize Scalper TPSL for breakeven tracking
-                p.scalper_tpsl.get_scalper_tp_sl(
-                    candles=list(p.engine.candles_1m),
-                    symbol=symbol,
-                    direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
-                    entry_price=float(buy_resp.get('buy', {}).get('buy_price', 0)) if buy_resp else 0.0
-                )
+                entry_price = float(buy_resp.get('buy', {}).get('buy_price', 0))
+                
+                # Retrieve from metadata we just passed
+                s_exit = metadata.get("scalper_exit")
+                s_tpsl = metadata.get("scalper_tpsl")
+                
+                if s_exit:
+                    s_exit.activate(
+                        trade_direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
+                        initial_volatility_state=volatility_state
+                    )
+                if s_tpsl:
+                    s_tpsl.get_scalper_tp_sl(
+                        candles=list(p.engine.candles_1m),
+                        symbol=symbol,
+                        direction="BUY" if contract_type in ["CALL", "MULTUP"] else "SELL",
+                        entry_price=entry_price
+                    )
         except Exception as e:
             logger.error(f"Error in execute_order for {symbol}: {e}")
 
@@ -907,7 +962,9 @@ class DerivConnector:
                             "entry_price": None,
                             "stop_loss": metadata.get('stop_loss'),
                             "take_profit": metadata.get('take_profit'),
-                            "strategy": metadata.get('strategy')
+                            "strategy": metadata.get('strategy'),
+                            "scalper_exit": metadata.get('scalper_exit'),
+                            "scalper_tpsl": metadata.get('scalper_tpsl')
                         }
                     
                     # OPTIMISTIC UI UPDATE
@@ -1000,25 +1057,30 @@ class DerivConnector:
                 candles = list(p.engine.candles_1m)
                 current_candle = candles[-1] if candles else None
                 
-                exit_decision = p.scalper_exit.get_scalper_exit_decision(
-                    momentum_up=momentum_up,
-                    momentum_down=momentum_down,
-                    slope_value=slope_value,
-                    candle=current_candle,
-                    volatility_state=volatility_state
-                )
+                # Use ISOLATED monitors from metadata
+                trade_scalper_exit = meta.get('scalper_exit')
+                trade_scalper_tpsl = meta.get('scalper_tpsl')
                 
-                if exit_decision["exit_now"]:
-                    should_close = True
-                    close_reason = f"Scalper Exit Triggered: {', '.join(exit_decision['triggers'])}"
-                    logger.info(f"[SCALPER EXIT] {close_reason}")
+                if trade_scalper_exit:
+                    exit_decision = trade_scalper_exit.get_scalper_exit_decision(
+                        momentum_up=momentum_up,
+                        momentum_down=momentum_down,
+                        slope_value=slope_value,
+                        candle=current_candle,
+                        volatility_state=volatility_state
+                    )
+                    
+                    if exit_decision["exit_now"]:
+                        should_close = True
+                        close_reason = f"Scalper Exit Triggered: {', '.join(exit_decision['triggers'])}"
+                        logger.info(f"[SCALPER EXIT] {close_reason}")
                 
                 # 2. Check for Breakeven Move
-                else:
-                    be_check = p.scalper_tpsl.check_breakeven(current_price)
+                if not should_close and trade_scalper_tpsl:
+                    be_check = trade_scalper_tpsl.check_breakeven(current_price)
                     if be_check["should_move_sl"]:
                         meta['stop_loss'] = be_check["new_sl_price"]
-                        logger.info(f"[SCALPER BREAKEVEN] Moved SL to {meta['stop_loss']} for {symbol}")
+                        logger.info(f"[SCALPER BREAKEVEN] Moved SL to {meta['stop_loss']} for {symbol} (Contract: {contract_id})")
             
             if should_close:
                 # Close the position via Deriv API
@@ -1030,8 +1092,7 @@ class DerivConnector:
                         logger.error(f"Failed to close contract {contract_id}: {close_resp['error']}")
                     else:
                         logger.info(f"Successfully closed contract {contract_id}")
-                        # Deactivate scalper monitoring for this symbol if all trades closed
-                        if p: p.scalper_exit.deactivate()
+                        # Isolated monitors handled by metadata cleanup below
                         
                         await stream_manager.broadcast_notification(
                             "Position Closed",
@@ -1328,9 +1389,26 @@ class DerivConnector:
         
         if indicator_data.get('rsi'):
             rsi = indicator_data['rsi']
-            buy_prob = max(0.1, min(0.9, (70 - rsi) / 40)) # Lower RSI -> higher buy prob
-            sell_prob = max(0.1, min(0.9, (rsi - 30) / 40)) # Higher RSI -> higher sell prob
+            # Base probability from 1m RSI
+            buy_prob = max(0.2, min(0.8, (70 - rsi) / 40))
+            sell_prob = max(0.2, min(0.8, (rsi - 30) / 40))
             
+            # Enhance with Multi-Timeframe Confirmation
+            rsi_hybrid = p.indicator_layer.get_multi_rsi_confirmation()
+            if rsi_hybrid.get("allow_buy"):
+                buy_prob = max(buy_prob, 0.75 + (rsi_hybrid.get("confidence_modifier", 0)))
+                sell_prob = min(sell_prob, 0.25)
+            elif rsi_hybrid.get("allow_sell"):
+                sell_prob = max(sell_prob, 0.75 + (rsi_hybrid.get("confidence_modifier", 0)))
+                buy_prob = min(buy_prob, 0.25)
+            
+            # Adjust by absolute direction
+            if rsi_hybrid.get("flow_1m") == "bullish": buy_prob += 0.05
+            if rsi_hybrid.get("flow_1m") == "bearish": sell_prob += 0.05
+        else:
+            buy_prob = 0.5
+            sell_prob = 0.5
+
         return {
             "symbol": symbol,
             "buyProbability": round(buy_prob, 2),

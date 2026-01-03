@@ -48,11 +48,15 @@ class MasterEngine:
             "high_chaos_count": 0
         }
         
-        # --- 8. Symbol Intelligence Profile ---
-        self.current_profile = SymbolIntelligence.get_market_profile("DEFAULT")
-        self.current_symbol = "DEFAULT"
+        # --- 9. Indicator Cache ---
+        self.indicator_cache = {
+            "trend": {}, # {tf: {"value": str, "last_count": int}}
+            "momentum": {}, # {tf: {"value": float, "last_count": int}}
+            "volatility": {}, # {tf: {"value": str, "last_count": int}}
+            "atr": {} # {tf: {"value": float, "last_count": int}}
+        }
         
-        logger.info("MasterEngine Initialized - Unified Intelligence Module")
+        logger.info("MasterEngine Initialized - Unified Intelligence Module (with Cache)")
 
     def reset(self):
         """Reset all data storage and memory for a clean start on a new symbol."""
@@ -186,6 +190,11 @@ class MasterEngine:
         """
         Trend states: "strong_up", "up", "neutral", "down", "strong_down"
         """
+        # Check Cache
+        candle_count = len(self._get_candles(tf))
+        if tf in self.indicator_cache["trend"] and self.indicator_cache["trend"][tf]["last_count"] == candle_count:
+            return self.indicator_cache["trend"][tf]["value"]
+
         candles = self._get_candles(tf)
         if not candles or len(candles) < 20: return "neutral"
         
@@ -200,41 +209,84 @@ class MasterEngine:
         # Slope check
         slope = current_ema20 - prev_ema20
         
+        val = "neutral"
         if current_ema20 > current_ema50:
             if slope > 0 and (current_ema20 - current_ema50) > (current_ema50 * 0.0002):
-                return "strong_up"
-            return "up"
+                val = "strong_up"
+            else:
+                val = "up"
         elif current_ema20 < current_ema50:
             if slope < 0 and (current_ema50 - current_ema20) > (current_ema50 * 0.0002):
-                return "strong_down"
-            return "down"
+                val = "strong_down"
+            else:
+                val = "down"
             
-        return "neutral"
+        # Update Cache
+        self.indicator_cache["trend"][tf] = {"value": val, "last_count": candle_count}
+        return val
 
     def get_momentum(self, tf: str) -> float:
         """Returns RSI (0-100)"""
+        # Check Cache
+        candle_count = len(self._get_candles(tf))
+        if tf in self.indicator_cache["momentum"] and self.indicator_cache["momentum"][tf]["last_count"] == candle_count:
+            return self.indicator_cache["momentum"][tf]["value"]
+
         candles = self._get_candles(tf)
         if not candles or len(candles) < 14: return 50.0
         closes = np.array([c['close'] for c in candles])
-        return self._rsi(closes, 14)[-1]
+        val = float(self._rsi(closes, 14)[-1])
+        
+        # Update Cache
+        self.indicator_cache["momentum"][tf] = {"value": val, "last_count": candle_count}
+        return val
 
     def get_volatility(self, tf: str) -> str:
         """Returns: 'low', 'normal', 'high', 'extreme'"""
+        # Check Cache
+        candle_count = len(self._get_candles(tf))
+        if tf in self.indicator_cache["volatility"] and self.indicator_cache["volatility"][tf]["last_count"] == candle_count:
+            return self.indicator_cache["volatility"][tf]["value"]
+
+        atr_val = self.get_atr(tf)
+        if atr_val == 0: return "normal"
+        
         candles = self._get_candles(tf)
-        if not candles or len(candles) < 20: return "normal"
+        highs = np.array([c['high'] for c in candles])
+        lows = np.array([c['low'] for c in candles])
+        closes = np.array([c['close'] for c in candles])
+        atr_series = self._atr(highs, lows, closes, 14)
+        avg = np.mean(atr_series[-20:])
+        
+        val = "normal"
+        if atr_val > avg * 2.5: val = "extreme"
+        elif atr_val > avg * 1.5: val = "high"
+        elif atr_val < avg * 0.7: val = "low"
+        
+        # Update Cache
+        self.indicator_cache["volatility"][tf] = {"value": val, "last_count": candle_count}
+        return val
+
+    def get_atr(self, tf: str) -> float:
+        """Returns the raw ATR value for the given timeframe."""
+        # Check Cache
+        candle_count = len(self._get_candles(tf))
+        if tf in self.indicator_cache["atr"] and self.indicator_cache["atr"][tf]["last_count"] == candle_count:
+            return self.indicator_cache["atr"][tf]["value"]
+
+        candles = self._get_candles(tf)
+        if not candles or len(candles) < 20: return 0.0
         
         highs = np.array([c['high'] for c in candles])
         lows = np.array([c['low'] for c in candles])
         closes = np.array([c['close'] for c in candles])
         
         atr = self._atr(highs, lows, closes, 14)
-        current = atr[-1]
-        avg = np.mean(atr[-20:])
+        val = float(atr[-1])
         
-        if current > avg * 2.5: return "extreme"
-        if current > avg * 1.5: return "high"
-        if current < avg * 0.7: return "low"
-        return "normal"
+        # Update Cache
+        self.indicator_cache["atr"][tf] = {"value": val, "last_count": candle_count}
+        return val
 
     def get_macro_trend(self) -> str:
         """Based on 1h timeframe only."""
@@ -347,8 +399,8 @@ class MasterEngine:
             
         wick_total = (c['high'] - max(c['close'], c['open'])) + (min(c['close'], c['open']) - c['low'])
         
-        # 1. Wick-to-body ratio > 3x
-        if (wick_total / body) > 4.0: # Tightened from 10.0
+        # 1. Wick-to-body ratio > 6x (Relaxed from 4.0)
+        if (wick_total / body) > 6.0: 
             return True
             
         # 2. ATR Spike > 2.5x average (Adjusted by Multiplier)
@@ -361,9 +413,9 @@ class MasterEngine:
         sensitivity = self.current_profile.get("noise_sensitivity", "medium")
         
         # Adjust threshold based on sensitivity
-        threshold = 2.5 # Tightened from 3.5
-        if sensitivity == "low": threshold = 3.5 # Tightened from 5.0
-        elif sensitivity == "high": threshold = 2.0 # Tightened from 2.5
+        threshold = 3.5 # Relaxed from 2.5
+        if sensitivity == "low": threshold = 5.0 # Relaxed from 3.5
+        elif sensitivity == "high": threshold = 2.5 # Relaxed from 2.0
             
         # Apply profile multiplier to normalized checking
         if atr[-1] > (np.mean(atr) * threshold * atr_mult):
@@ -417,7 +469,7 @@ class MasterEngine:
         curr_atr = atr[-1]
         
         # 1. Chaotic Check
-        if curr_atr > avg_atr * 2.0: # Or Noise detector true
+        if curr_atr > avg_atr * 3.0: # Relaxed from 2.0
             if self.detect_noise(candles):
                 return "chaotic"
         
