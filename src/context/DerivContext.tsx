@@ -7,7 +7,7 @@ export interface AccountMetadata {
     name: string;
     appId: string;
     token: string;
-    type: 'demo' | 'live';
+    type: 'demo' | 'live' | 'real';
 }
 
 interface DerivContextType {

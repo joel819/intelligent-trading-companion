@@ -3,7 +3,7 @@ export interface Account {
   name: string;
   balance: number;
   equity: number;
-  type: 'demo' | 'live';
+  type: 'demo' | 'live' | 'real';
   currency: string;
   isActive: boolean;
 }

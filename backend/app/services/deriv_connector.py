@@ -293,21 +293,35 @@ class DerivConnector:
                 self.available_accounts = []
                 for acc in raw_list:
                     acc_id = acc.get("loginid")
+                    is_virtual = acc.get("is_virtual")
+                    
+                    # Determine type explicitly
+                    if is_virtual:
+                        acc_type = "demo"
+                    elif acc_id.startswith("CR"): # Standard Deriv Real Account prefix
+                        acc_type = "real"
+                    elif acc_id.startswith("VR"): # Standard Deriv Virtual Account prefix
+                        acc_type = "demo"
+                    else:
+                         acc_type = "real" # Default to real for unknown prefixes if not virtual
+
                     self.available_accounts.append({
                         "id": acc_id,
-                        "name": f"Deriv {acc.get('currency')} {'Demo' if acc.get('is_virtual') else 'Real'}",
-                        "type": "demo" if acc.get("is_virtual") else "real",
+                        "name": f"Deriv {acc.get('currency')} {acc_type.capitalize()}",
+                        "type": acc_type,
                         "currency": acc.get("currency"),
-                        "balance": 0.0,
+                        "balance": 0.0, # Balance is not provided in account_list, requires individual auth
                         "equity": 0.0,
                         "isActive": acc_id == self.active_account_id
                     })
                 
-                # Map balance for active
+                # Update the active account's balance in the list
                 for acc in self.available_accounts:
                     if acc["id"] == self.active_account_id:
                         acc["balance"] = self.current_account["balance"]
                         acc["equity"] = self.current_account["balance"]
+                        acc["isActive"] = True
+
                 
                 if not self.token:
                     self.token = target_token

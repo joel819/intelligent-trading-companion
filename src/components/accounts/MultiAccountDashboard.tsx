@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { 
-  Wallet, 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  Users,
   PieChart,
   BarChart3,
   CheckCircle2,
@@ -83,22 +83,22 @@ interface AggregatedStats {
 }
 
 export const MultiAccountDashboard = () => {
-  const { 
-    accounts, 
-    selectedAccountId, 
-    setSelectedAccountId, 
+  const {
+    accounts,
+    selectedAccountId,
+    setSelectedAccountId,
     addAccount,
     isAuthorized,
     isConnected,
     positions
   } = useTradingData();
-  
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAccount, setNewAccount] = useState({
     name: '',
     appId: '',
     token: '',
-    type: 'demo' as 'demo' | 'live'
+    type: 'demo' as 'demo' | 'live' | 'real'
   });
 
   // Labels and Groups State (persisted to localStorage)
@@ -205,20 +205,20 @@ export const MultiAccountDashboard = () => {
   // Filtered accounts
   const filteredAccounts = useMemo(() => {
     let result = accounts;
-    
+
     if (filterLabel) {
-      result = result.filter(acc => 
+      result = result.filter(acc =>
         (accountLabels[acc.id] || []).includes(filterLabel)
       );
     }
-    
+
     if (filterGroup) {
       const group = groups.find(g => g.id === filterGroup);
       if (group) {
         result = result.filter(acc => group.accountIds.includes(acc.id));
       }
     }
-    
+
     return result;
   }, [accounts, filterLabel, filterGroup, accountLabels, groups]);
 
@@ -229,10 +229,10 @@ export const MultiAccountDashboard = () => {
     const totalEquity = targetAccounts.reduce((sum, acc) => sum + (acc.equity || 0), 0);
     const totalPnl = totalEquity - totalBalance;
     const totalPnlPercent = totalBalance > 0 ? (totalPnl / totalBalance) * 100 : 0;
-    
+
     const demoAccounts = targetAccounts.filter(acc => acc.type === 'demo');
-    const liveAccounts = targetAccounts.filter(acc => acc.type === 'live');
-    
+    const liveAccounts = targetAccounts.filter(acc => acc.type === 'live' || acc.type === 'real');
+
     // Group by currency
     const currencyMap = new Map<string, { balance: number; count: number }>();
     targetAccounts.forEach(acc => {
@@ -243,17 +243,17 @@ export const MultiAccountDashboard = () => {
         count: existing.count + 1
       });
     });
-    
+
     const currencyBreakdown = Array.from(currencyMap.entries()).map(([currency, data]) => ({
       currency,
       ...data
     }));
-    
+
     const typeBreakdown = [
       { type: 'Demo', balance: demoAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0), count: demoAccounts.length },
       { type: 'Live', balance: liveAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0), count: liveAccounts.length }
     ].filter(t => t.count > 0);
-    
+
     return {
       totalBalance,
       totalEquity,
@@ -270,12 +270,12 @@ export const MultiAccountDashboard = () => {
   const handleAddAccount = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAccount.appId || !newAccount.token) return;
-    
+
     addAccount({
       appId: newAccount.appId,
       token: newAccount.token
     });
-    
+
     setNewAccount({ name: '', appId: '', token: '', type: 'demo' });
     setShowAddForm(false);
   };
@@ -388,7 +388,7 @@ export const MultiAccountDashboard = () => {
               Comparison
             </TabsTrigger>
           </TabsList>
-          
+
           <div className="flex items-center gap-2">
             {/* Filter by Label */}
             <Popover>
@@ -397,8 +397,8 @@ export const MultiAccountDashboard = () => {
                   <Filter className="w-4 h-4" />
                   {filterLabel ? labels.find(l => l.id === filterLabel)?.name : 'Filter'}
                   {filterLabel && (
-                    <X 
-                      className="w-3 h-3 ml-1" 
+                    <X
+                      className="w-3 h-3 ml-1"
                       onClick={(e) => { e.stopPropagation(); setFilterLabel(null); }}
                     />
                   )}
@@ -446,9 +446,9 @@ export const MultiAccountDashboard = () => {
                     )}
                   </div>
                   {(filterLabel || filterGroup) && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="w-full mt-2"
                       onClick={() => { setFilterLabel(null); setFilterGroup(null); }}
                     >
@@ -458,7 +458,7 @@ export const MultiAccountDashboard = () => {
                 </div>
               </PopoverContent>
             </Popover>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -518,7 +518,7 @@ export const MultiAccountDashboard = () => {
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="demo">Demo</option>
-                    <option value="live">Live</option>
+                    <option value="real">Real</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -560,8 +560,8 @@ export const MultiAccountDashboard = () => {
               const isSelected = account.id === selectedAccountId;
               const pnl = (account.equity || 0) - (account.balance || 0);
               const pnlPercent = (account.balance || 0) > 0 ? (pnl / account.balance) * 100 : 0;
-              const balanceShare = aggregatedStats.totalBalance > 0 
-                ? ((account.balance || 0) / aggregatedStats.totalBalance) * 100 
+              const balanceShare = aggregatedStats.totalBalance > 0
+                ? ((account.balance || 0) / aggregatedStats.totalBalance) * 100
                 : 0;
 
               return (
@@ -590,7 +590,7 @@ export const MultiAccountDashboard = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={account.type === 'demo' ? 'secondary' : 'default'}>
-                          {account.type}
+                          {account.type === 'real' || account.type === 'live' ? 'Live' : 'Demo'}
                         </Badge>
                         {isSelected && isAuthorized && (
                           <Badge variant="outline" className="text-success border-success">
@@ -599,12 +599,12 @@ export const MultiAccountDashboard = () => {
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Labels on account */}
                     {accLabels.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {accLabels.map(label => (
-                          <span 
+                          <span
                             key={label.id}
                             className={cn("px-2 py-0.5 rounded-full text-xs text-white", label.color)}
                           >
@@ -656,9 +656,9 @@ export const MultiAccountDashboard = () => {
                     <div className="flex items-center gap-2 pt-2 border-t border-border">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="gap-1 text-xs h-7"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -690,12 +690,12 @@ export const MultiAccountDashboard = () => {
                           </div>
                         </PopoverContent>
                       </Popover>
-                      
+
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             className="gap-1 text-xs h-7"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -803,9 +803,9 @@ export const MultiAccountDashboard = () => {
                 <div className="space-y-2">
                   {labels.map((label) => {
                     const accountCount = Object.values(accountLabels).filter(ids => ids.includes(label.id)).length;
-                    
+
                     return (
-                      <div 
+                      <div
                         key={label.id}
                         className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group"
                       >
@@ -826,17 +826,17 @@ export const MultiAccountDashboard = () => {
                           {accountCount} account{accountCount !== 1 ? 's' : ''}
                         </span>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-7 w-7"
                             onClick={() => setEditingLabel(label)}
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive"
                             onClick={() => deleteLabel(label.id)}
                           >
@@ -883,7 +883,7 @@ export const MultiAccountDashboard = () => {
                 {/* Groups list */}
                 <div className="space-y-2">
                   {groups.map((group) => (
-                    <div 
+                    <div
                       key={group.id}
                       className="p-3 rounded-lg bg-muted/50 space-y-3"
                     >
@@ -893,16 +893,16 @@ export const MultiAccountDashboard = () => {
                         <span className="text-xs text-muted-foreground">
                           {group.accountIds.length} account{group.accountIds.length !== 1 ? 's' : ''}
                         </span>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                           onClick={() => deleteGroup(group.id)}
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
-                      
+
                       {/* Accounts in group */}
                       <div className="flex flex-wrap gap-1">
                         {accounts.map((account) => (
@@ -1101,14 +1101,14 @@ export const MultiAccountDashboard = () => {
                       }))}
                       margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                     >
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
                         textAnchor="end"
                         height={60}
                         tick={{ fontSize: 12 }}
                       />
-                      <YAxis 
+                      <YAxis
                         tickFormatter={(value) => `$${value.toLocaleString()}`}
                         tick={{ fontSize: 12 }}
                       />
@@ -1156,13 +1156,13 @@ export const MultiAccountDashboard = () => {
                     {accounts.map((account) => {
                       const pnl = (account.equity || 0) - (account.balance || 0);
                       const pnlPercent = (account.balance || 0) > 0 ? (pnl / account.balance) * 100 : 0;
-                      const share = aggregatedStats.totalBalance > 0 
-                        ? ((account.balance || 0) / aggregatedStats.totalBalance) * 100 
+                      const share = aggregatedStats.totalBalance > 0
+                        ? ((account.balance || 0) / aggregatedStats.totalBalance) * 100
                         : 0;
 
                       return (
-                        <tr 
-                          key={account.id} 
+                        <tr
+                          key={account.id}
                           className={cn(
                             "border-b border-border/50 hover:bg-muted/50 cursor-pointer transition-colors",
                             account.id === selectedAccountId && "bg-primary/5"
