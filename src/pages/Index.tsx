@@ -14,7 +14,7 @@ import { PerformanceAnalytics } from '@/components/dashboard/PerformanceAnalytic
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
-import { AccountsList } from '@/components/accounts/AccountsList';
+import { MultiAccountDashboard } from '@/components/accounts/MultiAccountDashboard';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { SymbolSelector } from '@/components/dashboard/SymbolSelector';
 import { useTradingData } from '@/hooks/useTradingData';
@@ -247,13 +247,9 @@ const Index = () => {
           )}
 
           {activeTab === 'accounts' && (
-            <div className="space-y-6 animate-fade-in max-w-2xl">
-              <h2 className="text-xl font-semibold">Trading Accounts</h2>
-              <AccountsList
-                accounts={accounts}
-                selectedAccountId={selectedAccountId}
-                onSelect={setSelectedAccountId}
-              />
+            <div className="space-y-6 animate-fade-in">
+              <h2 className="text-xl font-semibold">Multi-Account Management</h2>
+              <MultiAccountDashboard />
             </div>
           )}
 
