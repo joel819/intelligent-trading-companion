@@ -13,7 +13,7 @@ async def execute_trade(request: dict):
     # Extract params with defaults
     symbol = request.get('symbol', 'R_100')
     contract_type = request.get('contract_type', 'CALL')
-    amount = float(request.get('amount', 0.5))
+    amount = float(request.get('amount', 0.35))
     
     duration = int(request.get('duration', 5))
     duration_unit = request.get('duration_unit', 't')

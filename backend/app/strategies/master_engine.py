@@ -56,6 +56,10 @@ class MasterEngine:
             "atr": {} # {tf: {"value": float, "last_count": int}}
         }
         
+        # --- 10. Current Symbol Context ---
+        self.current_symbol = None
+        self.current_profile = {}
+        
         logger.info("MasterEngine Initialized - Unified Intelligence Module (with Cache)")
 
     def reset(self):

@@ -24,12 +24,13 @@ import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [lotSize, setLotSize] = useState(0.1); // Default Lot Size
+  const [lotSize, setLotSize] = useState(0.35); // Default Lot Size to 0.35 per user request
   const {
     accounts,
     selectedAccount,
     selectedAccountId,
     setSelectedAccountId,
+    toggleAccountType,
     positions,
     ticks,
     logs,
@@ -120,6 +121,7 @@ const Index = () => {
           accounts={accounts}
           selectedAccountId={selectedAccountId}
           onAccountChange={setSelectedAccountId}
+          onToggleAccountType={toggleAccountType}
           notifications={notifications}
           onNotificationsClick={handleNotificationsClick}
           isConnected={isConnected}
@@ -185,9 +187,12 @@ const Index = () => {
                       <input
                         type="number"
                         step="0.01"
-                        min="0.01"
+                        min="0.35"
                         value={lotSize}
-                        onChange={(e) => setLotSize(parseFloat(e.target.value))}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) setLotSize(val);
+                        }}
                         className="p-2 rounded border border-input bg-background w-24"
                       />
                     </div>

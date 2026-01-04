@@ -1,4 +1,4 @@
-import { Bell, User, Wifi, WifiOff, Search, Settings, Loader2 } from 'lucide-react';
+import { Bell, User, Wifi, WifiOff, Search, Settings, Loader2, ArrowLeftRight, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import type { Account, Notification } from '@/types/trading';
 
 interface HeaderProps {
@@ -26,6 +27,7 @@ interface HeaderProps {
   notifications: Notification[];
   onNotificationsClick: () => void;
   isConnected: boolean;
+  onToggleAccountType?: () => void;
 }
 
 export const Header = ({
@@ -34,7 +36,8 @@ export const Header = ({
   onAccountChange,
   notifications,
   onNotificationsClick,
-  isConnected
+  isConnected,
+  onToggleAccountType
 }: HeaderProps) => {
   const unreadCount = notifications.filter(n => !n.read).length;
   // const { isConnected } = useDeriv(); // Removed
@@ -61,6 +64,24 @@ export const Header = ({
             ))}
           </SelectContent>
         </Select>
+
+        {onToggleAccountType && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggleAccountType}
+            className={cn(
+              "gap-2 hidden lg:flex border-border/50 transition-all duration-300",
+              selectedAccount?.type === 'demo'
+                ? "hover:bg-primary/10 hover:border-primary/50 text-muted-foreground"
+                : "bg-success/5 border-success/30 hover:bg-success/10 text-success font-semibold"
+            )}
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            {selectedAccount?.type === 'demo' ? 'Switch to Real' : 'Switch to Demo'}
+            {selectedAccount?.type === 'real' && <Shield className="w-3 h-3 fill-success/20" />}
+          </Button>
+        )}
 
         {selectedAccount && (
           <div className="hidden md:flex items-center gap-4 text-sm">

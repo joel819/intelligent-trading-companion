@@ -20,6 +20,7 @@ interface DerivContextType {
     addAccount: (metadata: AccountMetadata) => void;
     removeAccount: (id: string) => void;
     switchAccount: (id: string) => void;
+    toggleAccountType: () => void;
     symbols: any[];
     selectedSymbol: string;
     setSelectedSymbol: (symbol: string) => void;
@@ -38,10 +39,20 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
     const [account, setAccount] = useState<Account | null>(null);
     const [accountsMetadata, setAccountsMetadata] = useState<AccountMetadata[]>([]);
     const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+    const [lastDemoAccountId, setLastDemoAccountId] = useState<string | null>(null);
+    const [lastRealAccountId, setLastRealAccountId] = useState<string | null>(null);
     const [symbols, setSymbols] = useState<any[]>([]);
     const [selectedSymbol, setSelectedSymbol] = useState<string>('R_100');
     const [ticks, setTicks] = useState<any[]>([]);
     const socketRef = useRef<DerivWebSocket | null>(null);
+
+    // Persist last used account IDs
+    useEffect(() => {
+        const savedDemo = localStorage.getItem('last_demo_account_id');
+        const savedReal = localStorage.getItem('last_real_account_id');
+        if (savedDemo) setLastDemoAccountId(savedDemo);
+        if (savedReal) setLastRealAccountId(savedReal);
+    }, []);
 
     // Load accounts from LocalStorage on mount
     useEffect(() => {
@@ -50,7 +61,15 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
             try {
                 const parsed = JSON.parse(saved);
                 setAccountsMetadata(parsed);
-                if (parsed.length > 0) {
+
+                // Prioritize Real account if exists and no preference saved
+                const realAcc = parsed.find((acc: any) => acc.type === 'real' || acc.type === 'live');
+                const lastReal = localStorage.getItem('last_real_account_id');
+                const lastDemo = localStorage.getItem('last_demo_account_id');
+
+                if (realAcc && !lastDemo && !lastReal) {
+                    setActiveAccountId(realAcc.id);
+                } else if (parsed.length > 0) {
                     setActiveAccountId(parsed[0].id);
                 }
             } catch (e) {
@@ -97,6 +116,34 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
 
     const switchAccount = (id: string) => {
         setActiveAccountId(id);
+        const acc = accountsMetadata.find(a => a.id === id);
+        if (acc) {
+            if (acc.type === 'demo') {
+                setLastDemoAccountId(id);
+                localStorage.setItem('last_demo_account_id', id);
+            } else {
+                setLastRealAccountId(id);
+                localStorage.setItem('last_real_account_id', id);
+            }
+        }
+    };
+
+    const toggleAccountType = () => {
+        const currentAcc = accountsMetadata.find(acc => acc.id === activeAccountId);
+        if (!currentAcc) return;
+
+        const targetType = (currentAcc.type === 'demo') ? 'real' : 'demo';
+        const lastId = targetType === 'demo' ? lastDemoAccountId : lastRealAccountId;
+
+        let targetAcc = accountsMetadata.find(acc => acc.id === lastId && (acc.type === targetType || (targetType === 'real' && acc.type === 'live')));
+
+        if (!targetAcc) {
+            targetAcc = accountsMetadata.find(acc => acc.type === targetType || (targetType === 'real' && acc.type === 'live'));
+        }
+
+        if (targetAcc) {
+            switchAccount(targetAcc.id);
+        }
     };
 
     // Effect to handle connection/re-connection when activeAccountId changes
@@ -227,6 +274,7 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
             addAccount,
             removeAccount,
             switchAccount,
+            toggleAccountType,
             symbols,
             selectedSymbol,
             setSelectedSymbol,

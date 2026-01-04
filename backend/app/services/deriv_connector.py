@@ -61,11 +61,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DerivConnector:
-    def __init__(self, token: str = None, app_id: str = "65395"):
-        self.token = token or os.getenv("DERIV_TOKEN")
-        self.app_id = app_id or os.getenv("DERIV_APP_ID", "65395")
+    def __init__(self, token: str = None, app_id: str = "118882"):
+        # Prioritize Real credentials for initial lock
+        real_token = os.getenv("DERIV_REAL_TOKEN")
+        real_app_id = os.getenv("DERIV_REAL_APP_ID", "118882")
+        
+        self.token = token or real_token or os.getenv("DERIV_TOKEN")
+        self.app_id = app_id or real_app_id or os.getenv("DERIV_APP_ID", "118882")
+        
         if not self.token:
-            logger.warning("No DERIV_TOKEN found in environment. Connection may fail.")
+            logger.warning("No DERIV_TOKEN or DERIV_REAL_TOKEN found in environment.")
         self.ws = None
         self.ws = None
         self.is_connected = False
@@ -77,6 +82,30 @@ class DerivConnector:
         self.active_account_id = None
         # Account Data
         self.available_accounts: List[Dict] = []
+        # Map account IDs to tokens for switching
+        self.account_tokens: Dict[str, str] = {}
+        
+        # Load tokens from env
+        if self.token:
+            # We don't know the ID yet, will map on first auth
+            pass
+            
+        real_token = os.getenv("DERIV_REAL_TOKEN")
+        if real_token:
+            # Map the known Real Account ID to this token
+            self.account_tokens["CR6512853"] = real_token
+            # Also add to available accounts so it appears in the list even before first auth
+            self.available_accounts.append({
+                "id": "CR6512853",
+                "name": "Deriv USD Real",
+                "type": "real",
+                "currency": "USD",
+                "balance": 0.0,
+                "equity": 0.0,
+                "isActive": False,
+                "token": real_token
+            })
+
         self.current_account: Dict = {}
         self.open_positions: List[Dict] = []
         
@@ -267,14 +296,6 @@ class DerivConnector:
                 self.is_authorized = True
                 logger.info(msg)
                 
-                await stream_manager.broadcast_log({
-                    "id": str(uuid.uuid4()),
-                    "timestamp": datetime.now().isoformat(),
-                    "message": msg,
-                    "level": "success",
-                    "source": "Deriv"
-                })
-                
                 # Setup current account
                 self.current_account = {
                     "id": loginid,
@@ -289,32 +310,52 @@ class DerivConnector:
                     self.start_balance = self.current_account["balance"]
                     logger.info(f"Bot Session Start Balance Initialized: ${self.start_balance}")
                 
-                # Parse Account List
+                # Parse Account List from Auth Response
                 raw_list = auth_data.get("account_list", [])
-                self.available_accounts = []
-                for acc in raw_list:
-                    acc_id = acc.get("loginid")
-                    is_virtual = acc.get("is_virtual")
-                    
-                    # Determine type explicitly
-                    if is_virtual:
-                        acc_type = "demo"
-                    elif acc_id.startswith("CR"): # Standard Deriv Real Account prefix
-                        acc_type = "real"
-                    elif acc_id.startswith("VR"): # Standard Deriv Virtual Account prefix
-                        acc_type = "demo"
-                    else:
-                         acc_type = "real" # Default to real for unknown prefixes if not virtual
+                if raw_list:
+                    self.available_accounts = []
+                    for acc in raw_list:
+                        acc_id = acc.get("loginid")
+                        is_virtual = acc.get("is_virtual")
+                        
+                        # Determine type explicitly
+                        if is_virtual:
+                            acc_type = "demo"
+                        elif acc_id.startswith("CR"):
+                            acc_type = "real"
+                        elif acc_id.startswith("VR"):
+                            acc_type = "demo"
+                        else:
+                             acc_type = "real"
 
-                    self.available_accounts.append({
-                        "id": acc_id,
-                        "name": f"Deriv {acc.get('currency')} {acc_type.capitalize()}",
-                        "type": acc_type,
-                        "currency": acc.get("currency"),
-                        "balance": 0.0, # Balance is not provided in account_list, requires individual auth
-                        "equity": 0.0,
-                        "isActive": acc_id == self.active_account_id
-                    })
+                        self.available_accounts.append({
+                            "id": acc_id,
+                            "name": f"Deriv {acc.get('currency')} {acc_type.capitalize()}",
+                            "type": acc_type,
+                            "currency": acc.get("currency"),
+                            "balance": self.current_account['balance'] if acc_id == loginid else 0.0,
+                            "equity": self.current_account['balance'] if acc_id == loginid else 0.0,
+                            "isActive": acc_id == self.active_account_id
+                        })
+                
+                await stream_manager.broadcast_log({
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.now().isoformat(),
+                    "message": msg,
+                    "level": "success",
+                    "source": "Deriv"
+                })
+
+                # RE-SUBSCRIBE to critical streams after authorization
+                # because switching tokens resets the session context
+                await self.subscribe_balance()
+                await self.subscribe_ticks()
+                await self.subscribe_portfolio()
+                
+                # Broadcast updated account list to frontend immediately
+                await stream_manager.broadcast_event('accounts', self.available_accounts)
+                
+                return auth_data
                 
                 # Update the active account's balance in the list
                 for acc in self.available_accounts:
@@ -1123,6 +1164,18 @@ class DerivConnector:
         # Update internal state
         self.current_account['balance'] = balance
         self.current_account['currency'] = currency
+        
+        # Also update the specific account in available_accounts if meaningful ID is present
+        login_id = balance_data.get('loginid')
+        if login_id:
+            for acc in self.available_accounts:
+                if acc.get('id') == login_id:
+                    acc['balance'] = balance
+                    acc['currency'] = currency
+                    logger.info(f"Updated balance for {login_id}: {balance} {currency}")
+                    # Broadcast critical update so UI refreshes immediately
+                    await stream_manager.broadcast_event('accounts', self.available_accounts)
+                    break
         
         # Update list
         for acc in self.available_accounts:

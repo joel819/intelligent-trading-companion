@@ -11,6 +11,7 @@ interface TradingContextType {
     selectedAccount: Account;
     selectedAccountId: string | null;
     setSelectedAccountId: (id: string) => void;
+    toggleAccountType: () => void;
     addAccount: (data: { token: string; appId: string }) => void;
     removeAccount: (id: string) => void;
     accountsMetadata: any[];
@@ -189,8 +190,12 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
 
     const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
 
-    // Determine selected account
-    const selectedAccountVisible = accounts.find(a => a.id === selectedAccountId) || accounts[0];
+    // Determine selected account - prioritize what backend says is active
+    const activeAccount = accounts.find(a => a.isActive);
+    const selectedAccountVisible = activeAccount || accounts.find(a => a.id === selectedAccountId) || accounts[0];
+    // DEBUG: Trace why selectedAccount might be missing/defaulting
+    // console.log("[TradingContext] Selection Trace:", { selectedAccountId, visible: selectedAccountVisible, all: accounts });
+
     const selectedAccount = selectedAccountVisible || {
         id: "not_found",
         name: isConnected ? (botStatus.isAuthorized ? "No Account Selected" : "Waiting for Authorization...") : "Backend Disconnected",
@@ -248,6 +253,40 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         api.accounts.select(id).catch(err => console.error("Failed to select account", err));
     };
 
+    // Safety: Ensure selectedAccountId is valid, else default to first
+    useEffect(() => {
+        if (accounts.length > 0) {
+            const exists = accounts.find(a => a.id === selectedAccountId);
+            if (!exists) {
+                console.log("[TradingContext] Selected account ID not found in list, defaulting to first:", accounts[0].id);
+                switchAccount(accounts[0].id);
+            }
+        }
+    }, [accounts.length, selectedAccountId]);
+
+    const toggleAccountType = () => {
+
+        // Use the derived selectedAccount (or fallback) instead of just the state
+        const currentAcc = accounts.find(acc => acc.id === selectedAccountId) || accounts[0];
+
+        if (!currentAcc) return;
+
+        const targetType = (currentAcc.type === 'demo') ? 'real' : 'demo';
+
+        // Find accounts of the other type
+        const otherTypeAccounts = accounts.filter(acc =>
+            (targetType === 'demo' && acc.type === 'demo') ||
+            (targetType === 'real' && (acc.type === 'real' || acc.type === 'live'))
+        );
+
+        if (otherTypeAccounts.length > 0) {
+            // In TradingContext, we'll just switch to the first one available for now
+            // as multi-account persistence is handled in DerivContext which this context
+            // might be eventually merged with or simplified by.
+            switchAccount(otherTypeAccounts[0].id);
+        }
+    };
+
     // 9. WebSocket Stream (Singleton)
     // 9. WebSocket Stream (with Auto-Reconnect & Debugging)
     const wsRef = useRef<WebSocket | null>(null);
@@ -301,6 +340,10 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
                     if (data.type === 'positions' && data.data) {
                         console.log('[TradingContext] Received positions update:', data.data.length, 'positions', data.data.map((p: any) => p.id));
                         setPositions(data.data);
+                    }
+                    if (data.type === 'accounts' && data.data) {
+                        console.log("[TradingContext] Received accounts update:", data.data);
+                        queryClient.setQueryData(['accounts'], data.data);
                     }
                     if (data.type === 'balance' && data.data) queryClient.setQueryData(['accounts'], (old: any) => {
                         if (!Array.isArray(old)) return old;
@@ -356,6 +399,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         selectedAccount,
         selectedAccountId: selectedAccount.id,
         setSelectedAccountId: switchAccount,
+        toggleAccountType,
         addAccount: (data: any) => addAccountMutation.mutate(data),
         removeAccount: (id: string) => console.log("Remove", id),
         accountsMetadata: [],

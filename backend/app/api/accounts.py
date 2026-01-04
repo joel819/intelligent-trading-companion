@@ -27,8 +27,9 @@ async def select_account(account_id: str):
     deriv_client.active_account_id = account_id
     
     # Trigger re-authorization if we have a token for this account
-    # We check both the account object and our internal token map
-    token = target_acc.get("token") or deriv_client.account_tokens.get(account_id)
+    # We check both the account object and our internal token map (handle missing attr safely)
+    tokens_map = getattr(deriv_client, "account_tokens", {})
+    token = target_acc.get("token") or tokens_map.get(account_id)
     
     if token:
         await deriv_client.authorize(token)
