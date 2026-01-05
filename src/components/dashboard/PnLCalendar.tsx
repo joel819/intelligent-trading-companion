@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  ChevronLeft,
+  ChevronRight,
   Calendar as CalendarIcon,
   TrendingUp,
   TrendingDown,
@@ -32,34 +32,24 @@ import {
   isToday
 } from 'date-fns';
 
-// Mock P&L data - replace with real data from API
-const generateMockPnLData = () => {
-  const data: Record<string, number> = {};
-  const today = new Date();
-  
-  // Generate random P&L for the past 365 days
-  for (let i = 0; i < 365; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - i);
-    const dateKey = format(date, 'yyyy-MM-dd');
-    
-    // Random P&L between -500 and 800 with some days having no trades
-    const hasTrades = Math.random() > 0.3;
-    if (hasTrades) {
-      data[dateKey] = Math.round((Math.random() * 1300 - 500) * 100) / 100;
-    }
-  }
-  
-  return data;
-};
-
-const mockPnLData = generateMockPnLData();
-
-interface PnLCalendarProps {
-  pnlData?: Record<string, number>;
+interface DailyStats {
+  date: string;
+  pnl: number;
 }
 
-export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
+interface PnLCalendarProps {
+  pnlData?: DailyStats[];
+}
+
+export const PnLCalendar = ({ pnlData = [] }: PnLCalendarProps) => {
+  // Transform performance data to Map for easy lookup: { 'yyyy-MM-dd': pnl }
+  const transformedPnLData = useMemo(() => {
+    const data: Record<string, number> = {};
+    pnlData.forEach(day => {
+      data[day.date] = day.pnl;
+    });
+    return data;
+  }, [pnlData]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'daily' | 'weekly' | 'monthly'>('daily');
 
@@ -85,7 +75,7 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const values = Object.values(pnlData);
+    const values = Object.values(transformedPnLData);
     const totalPnL = values.reduce((sum, v) => sum + v, 0);
     const winDays = values.filter(v => v > 0).length;
     const lossDays = values.filter(v => v < 0).length;
@@ -93,9 +83,9 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
     const worstDay = values.length ? Math.min(...values) : 0;
     const avgPnL = values.length ? totalPnL / values.length : 0;
     const maxAbsPnL = Math.max(Math.abs(bestDay), Math.abs(worstDay));
-    
+
     return { totalPnL, winDays, lossDays, bestDay, worstDay, avgPnL, maxAbsPnL };
-  }, [pnlData]);
+  }, [transformedPnLData]);
 
   // Daily view calendar
   const renderDailyView = () => {
@@ -138,10 +128,10 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
               {day}
             </div>
           ))}
-          
+
           {days.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
-            const pnl = pnlData[dateKey];
+            const pnl = transformedPnLData[dateKey];
             const isCurrentMonth = isSameMonth(day, currentDate);
             const intensity = getIntensity(pnl, stats.maxAbsPnL);
 
@@ -188,16 +178,16 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
     const weeks: { weekNum: number; year: number; startDate: Date; pnl: number }[] = [];
     const yearStart = startOfYear(currentDate);
     const today = new Date();
-    
+
     let currentWeekStart = startOfWeek(yearStart, { weekStartsOn: 1 });
-    
+
     while (currentWeekStart <= today) {
       const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
       const daysInWeek = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
-      
+
       const weekPnL = daysInWeek.reduce((sum, day) => {
         const dateKey = format(day, 'yyyy-MM-dd');
-        return sum + (pnlData[dateKey] || 0);
+        return sum + (transformedPnLData[dateKey] || 0);
       }, 0);
 
       weeks.push({
@@ -223,7 +213,7 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-13 gap-2">
           {weeks.slice(-52).map((week, idx) => {
             const intensity = getIntensity(week.pnl, maxAbsWeekPnL);
-            
+
             return (
               <div
                 key={idx}
@@ -262,15 +252,15 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
       const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-      
+
       const monthPnL = daysInMonth.reduce((sum, day) => {
         const dateKey = format(day, 'yyyy-MM-dd');
-        return sum + (pnlData[dateKey] || 0);
+        return sum + (transformedPnLData[dateKey] || 0);
       }, 0);
 
       const tradingDays = daysInMonth.filter(day => {
         const dateKey = format(day, 'yyyy-MM-dd');
-        return pnlData[dateKey] !== undefined;
+        return transformedPnLData[dateKey] !== undefined;
       }).length;
 
       return { month, pnl: monthPnL, tradingDays };
@@ -303,7 +293,7 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
         <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {monthlyData.map((data, idx) => {
             const intensity = getIntensity(data.pnl, maxAbsMonthPnL);
-            
+
             return (
               <Card
                 key={idx}
@@ -357,8 +347,8 @@ export const PnLCalendar = ({ pnlData = mockPnLData }: PnLCalendarProps) => {
           <CardContent className="p-4 text-center">
             <div className="text-xs text-muted-foreground uppercase tracking-wide">Win Rate</div>
             <div className="text-xl font-mono font-bold mt-1 text-success">
-              {stats.winDays + stats.lossDays > 0 
-                ? ((stats.winDays / (stats.winDays + stats.lossDays)) * 100).toFixed(1) 
+              {stats.winDays + stats.lossDays > 0
+                ? ((stats.winDays / (stats.winDays + stats.lossDays)) * 100).toFixed(1)
                 : 0}%
             </div>
             <div className="text-xs text-muted-foreground">

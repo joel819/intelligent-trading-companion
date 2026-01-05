@@ -1496,15 +1496,13 @@ class DerivConnector:
         elif new_symbol.startswith("R") and "_" not in new_symbol:
             api_symbol = "R_" + new_symbol[1:]
             
-        logger.info(f"Targeting new symbol: {api_symbol}")
-        
         # Add to enabled if not there
         if api_symbol not in self.enabled_symbols:
             self.enabled_symbols.append(api_symbol)
             # Re-subscribe to all (to include new one)
             await self.subscribe_ticks()
             # Prime history
-            await self.warm_up_history()
+            # await self.warm_up_history()
             
         # Reset engine for clean start on this symbol
         if api_symbol in self.processors:

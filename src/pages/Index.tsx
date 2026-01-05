@@ -46,7 +46,8 @@ const Index = () => {
     setSelectedSymbol,
     symbols,
     marketStatus,
-    latestPrediction
+    latestPrediction,
+    performanceAnalytics
   } = useTradingData();
 
   const handleNotificationsClick = () => {
@@ -173,7 +174,7 @@ const Index = () => {
               {/* Price Chart */}
               <PriceChart
                 symbol={selectedSymbol || 'VOLATILITY 75'}
-                ticks={ticks}
+                ticks={ticks[selectedSymbol] || []}
                 positions={safePositions}
               />
 
@@ -221,7 +222,7 @@ const Index = () => {
                   />
                   <BotControl status={botStatus} onToggle={toggleBot} />
                   <MarketStatusCard />
-                  <TickFeed ticks={ticks.filter((t: any) => t?.symbol === selectedSymbol)} />
+                  <TickFeed ticks={ticks[selectedSymbol] || []} />
                 </div>
               </div>
             </div>
@@ -232,7 +233,7 @@ const Index = () => {
               <h2 className="text-xl font-semibold">Open Positions</h2>
               <PositionsTable positions={safePositions} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <TickFeed ticks={ticks} />
+                <TickFeed ticks={ticks[selectedSymbol] || []} />
                 <LogsStream logs={logs} />
               </div>
             </div>
@@ -255,7 +256,7 @@ const Index = () => {
           {activeTab === 'calendar' && (
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-xl font-semibold">P&L Calendar</h2>
-              <PnLCalendar />
+              <PnLCalendar pnlData={performanceAnalytics} />
             </div>
           )}
 

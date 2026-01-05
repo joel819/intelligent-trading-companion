@@ -51,6 +51,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
 
   const [loading, setLoading] = useState(true);
   const [candles, setCandles] = useState<CandleData[]>([]);
+  const [legendData, setLegendData] = useState<any>(null);
 
   // 1. Initial Chart Setup
   useEffect(() => {
@@ -59,7 +60,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const chartOptions = {
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: 'rgba(255, 255, 255, 0.5)',
+        textColor: 'rgba(255, 255, 255, 0.9)',
       },
       grid: {
         vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
@@ -134,18 +135,22 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
       borderVisible: false,
       wickUpColor: '#22c55e',
       wickDownColor: '#ef4444',
+      lastValueVisible: true,
+      priceLineVisible: true,
     });
 
     const smaSeries = chart.addSeries(LineSeries, {
       color: '#3b82f6',
       lineWidth: 2,
       visible: showIndicators.sma,
+      lastValueVisible: true,
     });
 
     const emaSeries = chart.addSeries(LineSeries, {
       color: '#fbbf24',
       lineWidth: 2,
       visible: showIndicators.ema,
+      lastValueVisible: true,
     });
 
     const bbUpper = chart.addSeries(LineSeries, {
@@ -165,6 +170,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const rsiSeries = rsiChart.addSeries(LineSeries, {
       color: '#d946ef', // Brighter Magenta for visibility
       lineWidth: 3, // Thicker line
+      lastValueVisible: true,
       priceFormat: {
         type: 'custom',
         formatter: (price: number) => price.toFixed(0),
@@ -200,17 +206,20 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const macdSeries = macdChart.addSeries(LineSeries, {
       color: '#3b82f6',
       lineWidth: 2,
+      lastValueVisible: true,
       priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
     }) as ISeriesApi<"Line">;
 
     const signalSeries = macdChart.addSeries(LineSeries, {
       color: '#ef4444',
       lineWidth: 2,
+      lastValueVisible: true,
       priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
     }) as ISeriesApi<"Line">;
 
     const histSeries = macdChart.addSeries(HistogramSeries, {
       color: '#22c55e',
+      lastValueVisible: true,
       priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
     }) as ISeriesApi<"Histogram">;
 
@@ -245,7 +254,40 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     const markersPlugin = createSeriesMarkers(candleSeries);
     markersPluginRef.current = markersPlugin;
 
-    // Synchronize Crosshair
+    // Synchronize Crosshair and Update Legend
+    const handleIndicatorValues = (param: any) => {
+      if (!param.time || param.point === undefined) {
+        // Fallback to latest candle values
+        if (candlesRef.current.length > 0) {
+          const last = candlesRef.current[candlesRef.current.length - 1];
+          setLegendData({
+            ohlc: last,
+            sma: (smaSeries.data()?.slice(-1)[0] as any)?.value,
+            ema: (emaSeries.data()?.slice(-1)[0] as any)?.value,
+            rsi: (rsiSeries.data()?.slice(-1)[0] as any)?.value,
+            macd: (macdSeries.data()?.slice(-1)[0] as any)?.value,
+            signal: (signalSeries.data()?.slice(-1)[0] as any)?.value,
+            hist: (histSeries.data()?.slice(-1)[0] as any)?.value,
+          });
+        }
+        return;
+      }
+
+      const ohlc = param.seriesData.get(candleSeries);
+      const sma = param.seriesData.get(smaSeries) as any;
+      const ema = param.seriesData.get(emaSeries) as any;
+      const rsi = param.seriesData.get(rsiSeries) as any;
+      const macd = param.seriesData.get(macdSeries) as any;
+      const signal = param.seriesData.get(signalSeries) as any;
+      const hist = param.seriesData.get(histSeries) as any;
+
+      setLegendData({ ohlc, sma: sma?.value, ema: ema?.value, rsi: rsi?.value, macd: macd?.value, signal: signal?.value, hist: hist?.value });
+    };
+
+    chart.subscribeCrosshairMove(handleIndicatorValues);
+    rsiChart.subscribeCrosshairMove(handleIndicatorValues);
+    macdChart.subscribeCrosshairMove(handleIndicatorValues);
+
     syncCrosshair(chart, rsiChart, rsiSeries);
     syncCrosshair(chart, macdChart, macdSeries);
     syncCrosshair(rsiChart, chart, candleSeries);
@@ -720,6 +762,41 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         )}
+
+        {/* Dynamic Legend Overlay */}
+        {legendData && (
+          <div className="absolute top-0 left-5 z-10 p-2 text-[10px] font-mono pointer-events-none flex flex-wrap gap-x-4 bg-background/40 backdrop-blur-sm rounded">
+            <div className="flex gap-2">
+              <span className="text-muted-foreground">O:</span> <span className={legendData.ohlc?.close >= legendData.ohlc?.open ? 'text-buy' : 'text-sell'}>{legendData.ohlc?.open?.toFixed(2)}</span>
+              <span className="text-muted-foreground">H:</span> <span className={legendData.ohlc?.close >= legendData.ohlc?.open ? 'text-buy' : 'text-sell'}>{legendData.ohlc?.high?.toFixed(2)}</span>
+              <span className="text-muted-foreground">L:</span> <span className={legendData.ohlc?.close >= legendData.ohlc?.open ? 'text-buy' : 'text-sell'}>{legendData.ohlc?.low?.toFixed(2)}</span>
+              <span className="text-muted-foreground">C:</span> <span className={legendData.ohlc?.close >= legendData.ohlc?.open ? 'text-buy' : 'text-sell'}>{legendData.ohlc?.close?.toFixed(2)}</span>
+            </div>
+            {showIndicators.sma && legendData.sma && (
+              <div className="flex gap-1">
+                <span className="text-[#3b82f6]">SMA20:</span> <span>{legendData.sma.toFixed(2)}</span>
+              </div>
+            )}
+            {showIndicators.ema && legendData.ema && (
+              <div className="flex gap-1">
+                <span className="text-[#fbbf24]">EMA9:</span> <span>{legendData.ema.toFixed(2)}</span>
+              </div>
+            )}
+            {legendData.rsi && (
+              <div className="flex gap-1">
+                <span className="text-[#d946ef]">RSI:</span> <span>{legendData.rsi.toFixed(2)}</span>
+              </div>
+            )}
+            {legendData.macd && (
+              <div className="flex gap-2">
+                <span className="text-[#3b82f6]">MACD:</span> <span>{legendData.macd.toFixed(4)}</span>
+                <span className="text-[#ef4444]">SIG:</span> <span>{legendData.signal?.toFixed(4)}</span>
+                <span className={legendData.hist >= 0 ? 'text-buy' : 'text-sell'}>HIST:</span> <span>{legendData.hist?.toFixed(4)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div ref={chartContainerRef} className="w-full" style={{ height: '300px' }} />
         <div className="border-t border-white/5 mt-1" />
         <div ref={rsiContainerRef} className="w-full" style={{ height: '100px' }} />

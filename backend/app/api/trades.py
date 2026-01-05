@@ -89,8 +89,8 @@ async def get_trade_history(limit: int = 50, offset: int = 0):
             "exitPrice": sell_price,
             "lots": buy_price, 
             "pnl": pnl,
-            "openTime": datetime.fromtimestamp(int(t.get('purchase_time', 0))).isoformat() if t.get('purchase_time') else '',
-            "closeTime": datetime.fromtimestamp(int(t.get('sell_time', 0))).isoformat() if t.get('sell_time') else '',
+            "openTime": datetime.utcfromtimestamp(int(t.get('purchase_time', 0))).isoformat() if t.get('purchase_time') else '',
+            "closeTime": datetime.utcfromtimestamp(int(t.get('sell_time', 0))).isoformat() if t.get('sell_time') else '',
             "strategy": t.get('app_id', 'External'),
             "duration": int(t.get('sell_time', 0)) - int(t.get('purchase_time', 0))
         })
@@ -100,10 +100,11 @@ async def get_trade_history(limit: int = 50, offset: int = 0):
 @router.get("/analytics/")
 async def get_performance_analytics():
     """Returns performance analytics derived from statement and profit table."""
-    # Fetch recent history
-    trades = await deriv_client.get_profit_table(limit=100)
+    # Fetch recent history - increased limit for better coverage (Deriv max is 500)
+    trades = await deriv_client.get_profit_table(limit=500)
     
     if not trades:
+        logger.warning("No trades found in profit table for analytics.")
         return []
 
     # Map to DailyStats
@@ -118,8 +119,8 @@ async def get_performance_analytics():
             if 'balance' in resp:
                 current_balance = float(resp['balance'].get('balance', current_balance))
                 deriv_client.current_account['balance'] = current_balance
-        except:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to refresh balance: {e}")
             
     # 2. Extract stats from trades
     total_captured_pnl = 0
@@ -129,7 +130,11 @@ async def get_performance_analytics():
         sell_price = float(t.get('sell_price', 0))
         pnl = float(t.get('profit_loss', sell_price - buy_price))
         
-        date = datetime.fromtimestamp(int(t.get('sell_time', 0))).strftime('%Y-%m-%d')
+        # Use UTC for consistent global date grouping
+        dt = datetime.utcfromtimestamp(int(t.get('sell_time', 0)))
+        date = dt.strftime('%Y-%m-%d')
+        
+        logger.debug(f"Aggregation: {date} | Trade: {t.get('contract_id')} | PnL: {pnl}")
         
         if date not in daily_stats:
             daily_stats[date] = {"date": date, "pnl": 0, "trades": 0, "wins": 0, "losses": 0}
@@ -139,6 +144,8 @@ async def get_performance_analytics():
         if pnl > 0: daily_stats[date]["wins"] += 1
         else: daily_stats[date]["losses"] += 1
         total_captured_pnl += pnl
+
+    logger.info(f"Analytics: Processed {len(trades)} trades across {len(daily_stats)} days. Total Captured PnL: {total_captured_pnl}")
 
     # 3. Build equity curve by working backwards from current balance
     cumulative_equity = current_balance - total_captured_pnl

@@ -17,7 +17,7 @@ interface TradingContextType {
     accountsMetadata: any[];
     authError: string | null;
     positions: Position[];
-    ticks: any[];
+    ticks: Record<string, any[]>;
     symbols: any[];
     selectedSymbol: string;
     setSelectedSymbol: (symbol: string) => void;
@@ -47,7 +47,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [];
 export const TradingProvider = ({ children }: { children: ReactNode }) => {
     const queryClient = useQueryClient();
     const [isConnected, setIsConnected] = useState(false);
-    const [derivTicks, setDerivTicks] = useState<any[]>([]);
+    const [derivTicks, setDerivTicks] = useState<Record<string, any[]>>({});
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
     const [symbols, setSymbols] = useState<any[]>([]);
@@ -82,18 +82,33 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         refetchInterval: 1000
     });
 
-    useEffect(() => {
-        // REMOVED: setIsConnected(botStatus.isConnected); 
-        // We rely SOLELY on WebSocket for connection state to prevent race conditions/flickering.
+    // Sync selectedSymbol with backend if it changes
+    const handleSetSelectedSymbol = async (symbol: string) => {
+        setSelectedSymbol(symbol);
+        try {
+            await api.settings.setSymbol(symbol);
+            queryClient.invalidateQueries({ queryKey: ['botStatus'] });
+        } catch (error) {
+            console.error('Failed to sync symbol with backend:', error);
+        }
+    };
 
-        // Sync selectedSymbol with backend if it changes (e.g. from another client or on initial load)
+    useEffect(() => {
         if (botStatus.symbol && botStatus.symbol !== selectedSymbol) {
             setSelectedSymbol(botStatus.symbol);
         }
     }, [botStatus.symbol]);
 
+    // Clear ticks on symbol change? No, keep history for multi-symbol.
+    // But we might want to prune old ones if memory is an issue.
+    // For now, let's NOT clear them to allow instant switching.
+    /*
     useEffect(() => {
-        setDerivTicks([]);
+        setDerivTicks({}); // Don't clear for simultaneous support
+        setSkippedSignals([]);
+    }, [selectedSymbol]);
+    */
+    useEffect(() => {
         setSkippedSignals([]);
     }, [selectedSymbol]);
 
@@ -294,6 +309,12 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
     const isMounted = useRef(true);
     const reconnectCount = useRef(0);
     const notificationRef = useRef(showNotification);
+    const selectedSymbolRef = useRef(selectedSymbol);
+
+    // Keep selectedSymbol ref in sync
+    useEffect(() => {
+        selectedSymbolRef.current = selectedSymbol;
+    }, [selectedSymbol]);
 
     // Keep notification ref updated without triggering useEffect re-runs
     useEffect(() => {
@@ -332,7 +353,15 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
 
                     if (data.type === 'ping') return;
 
-                    if (data.type === 'tick' && data.data) setDerivTicks(prev => [data.data, ...prev].slice(0, 50));
+                    if (data.type === 'tick' && data.data) {
+                        const tick = data.data;
+                        setDerivTicks(prev => {
+                            const symbolTicks = prev[tick.symbol] || [];
+                            // Keep last 50 ticks per symbol
+                            const newSymbolTicks = [tick, ...symbolTicks].slice(0, 50);
+                            return { ...prev, [tick.symbol]: newSymbolTicks };
+                        });
+                    }
                     if (data.type === 'log' && data.data) setLogs(prev => {
                         if (prev.some(l => l.id === data.data.id)) return prev;
                         return [data.data, ...prev].slice(0, 100);
@@ -408,7 +437,7 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         ticks: derivTicks,
         symbols,
         selectedSymbol,
-        setSelectedSymbol,
+        setSelectedSymbol: handleSetSelectedSymbol,
         logs,
         skippedSignals,
         botStatus,

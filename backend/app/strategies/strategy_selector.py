@@ -33,6 +33,7 @@ STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
     "R_25": V10SuperSafeStrategy, "R25": V10SuperSafeStrategy,
     "R_50": V10SuperSafeStrategy, "R50": V10SuperSafeStrategy,
     "R_75": V75SuperSafeStrategy, "R75": V75SuperSafeStrategy,
+    "1HZ75V": V75SuperSafeStrategy, # 1s variant
     "R_100": V10SuperSafeStrategy, "R100": V10SuperSafeStrategy,
     
     # Boom/Crash 500
@@ -54,6 +55,7 @@ STRATEGY_DISPLAY_NAMES: Dict[str, str] = {
     "R_25": "Volatility 25 Safe",
     "R_50": "Volatility 50 Safe",
     "R_75": "Volatility 75 Safe",
+    "1HZ75V": "Volatility 75 (1s) Safe",
     "R_100": "Volatility 100 Safe",
     "BOOM_500": "Boom 500 Safe",
     "BOOM500": "Boom 500 Safe",
