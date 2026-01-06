@@ -75,7 +75,7 @@ class DerivConnector:
         self.ws = None
         self.is_connected = False
         self.is_authorized = False
-        self.active_symbols = ["R_10", "R_100", "R_75", "R_50"] 
+        self.active_symbols = ["R_10", "R_100", "R_75", "R_50", "1HZ75V"] 
         self.active_requests: Dict[str, asyncio.Future] = {} 
         self.listen_task: Optional[asyncio.Task] = None
         
@@ -123,7 +123,7 @@ class DerivConnector:
 
         # Symbol Processing Units
         self.processors: Dict[str, SymbolProcessor] = {}
-        self.enabled_symbols = ["R_10", "R_75"] # Both enabled by default
+        self.enabled_symbols = ["R_10", "R_75", "1HZ75V"] # Both enabled by default
         
         # Risk & Shared Services (Shared across all pairs)
         self.lot_calculator = WeightedLotCalculator()
@@ -853,7 +853,7 @@ class DerivConnector:
         except Exception as e:
             logger.error(f"Error in execute_order for {symbol}: {e}")
 
-    async def execute_buy(self, symbol: str, contract_type: str, amount: float, duration: int = 5, duration_unit: str = 't', metadata: dict = None):
+    async def execute_buy(self, symbol: str, contract_type: str, amount: float, duration: int = 5, duration_unit: str = 't', multiplier: int = None, metadata: dict = None):
         """
         Executes a real trade on Deriv with FIFO validation.
         """
@@ -893,25 +893,35 @@ class DerivConnector:
                 # DEBUG: Log available contract types for this symbol
                 logger.info(f"Available Contracts for {symbol} (API: {api_symbol}): {[c['contract_type'] for c in contracts[:5]]}")
                 
-                # --- AUTO-SWITCH FOR BOOM/CRASH (Multipliers Only) ---
+                # --- AUTO-SWITCH FOR BOOM/CRASH or MANUAL MULTIPLIER ---
                 effective_contract_type = contract_type
                 effective_duration = duration
                 effective_duration_unit = duration_unit
-                multiplier = None
+                selected_multiplier = multiplier
                 
                 is_boom_crash = "BOOM" in api_symbol or "CRASH" in api_symbol
                 
-                if is_boom_crash:
+                # Case 1: Explicit Multiplier Mode (MULTUP/MULTDOWN)
+                if contract_type in ["MULTUP", "MULTDOWN"]:
+                     effective_contract_type = contract_type
+                     # If multiplier not provided, try to default or keep None
+                     if not selected_multiplier:
+                         selected_multiplier = 20 # Default fallback
+                         
+                # Case 2: Auto-switch Legacy BOOM/CRASH calls
+                elif is_boom_crash:
                     if contract_type == "CALL":
                         effective_contract_type = "MULTUP"
                     elif contract_type == "PUT":
                         effective_contract_type = "MULTDOWN"
                     
-                    valid_multipliers = [c.get('multiplier') for c in contracts if c['contract_type'] == effective_contract_type]
-                    if valid_multipliers:
-                         multiplier = 20 
+                    if effective_contract_type in ["MULTUP", "MULTDOWN"]:
+                        valid_multipliers = [c.get('multiplier') for c in contracts if c['contract_type'] == effective_contract_type]
+                        if valid_multipliers and not selected_multiplier:
+                             selected_multiplier = 20 
                     
-                    logger.info(f"Auto-Switched Contract for {symbol}: {contract_type} -> {effective_contract_type} (Mult: {multiplier})")
+                    if effective_contract_type != contract_type:
+                        logger.info(f"Auto-Switched Contract for {symbol}: {contract_type} -> {effective_contract_type} (Mult: {selected_multiplier})")
 
                 # 2. Validation & Clamping
                 action_code = 1 if effective_contract_type in ["CALL", "MULTUP"] else 2
@@ -922,7 +932,7 @@ class DerivConnector:
                     "duration": effective_duration,
                     "duration_unit": effective_duration_unit,
                     "contract_type": effective_contract_type,
-                    "multiplier": multiplier
+                    "multiplier": selected_multiplier
                 }
                 validated_params = TradeManager.validate_and_clamp(mock_signal, contracts)
                 

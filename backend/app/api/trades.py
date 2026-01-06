@@ -17,6 +17,7 @@ async def execute_trade(request: dict):
     
     duration = int(request.get('duration', 5))
     duration_unit = request.get('duration_unit', 't')
+    multiplier = request.get('multiplier')
     
     result = await deriv_client.execute_buy(
         symbol=symbol,
@@ -24,6 +25,7 @@ async def execute_trade(request: dict):
         amount=amount,
         duration=duration,
         duration_unit=duration_unit,
+        multiplier=multiplier,
         metadata={
             "source": "Manual", 
             "stop_loss": request.get('stop_loss'), 

@@ -23,9 +23,59 @@ import { Wallet, TrendingUp, Activity, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+// Symbol-specific stake configurations (min, step, default) per mode
+type StakeConfig = { min: number; step: number; default: number };
+const SYMBOL_STAKE_CONFIG: Record<string, { options: StakeConfig; multipliers: StakeConfig }> = {
+  // Volatility Indices (1s variants)
+  '1HZ10V': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  '1HZ25V': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  '1HZ50V': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  '1HZ75V': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  '1HZ100V': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Standard Volatility Indices
+  'R_10': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'R_25': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'R_50': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'R_75': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'R_100': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Boom Indices
+  'BOOM300N': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'BOOM500': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'BOOM1000': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Crash Indices
+  'CRASH300N': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'CRASH500': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'CRASH1000': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Jump Indices
+  'JD10': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'JD25': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'JD50': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'JD75': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'JD100': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Step Index
+  'stpRNG': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Range Break Indices
+  'RDBULL': { options: { min: 0.50, step: 0.01, default: 0.50 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'RDBEAR': { options: { min: 0.50, step: 0.01, default: 0.50 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Forex Pairs
+  'FRXEURUSD': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'FRXGBPUSD': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  'FRXUSDJPY': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Default fallback
+  'default': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+};
+
+const getStakeConfig = (symbol: string, mode: 'OPTIONS' | 'MULTIPLIERS'): StakeConfig => {
+  const cfg = SYMBOL_STAKE_CONFIG[symbol] || SYMBOL_STAKE_CONFIG['default'];
+  return mode === 'OPTIONS' ? cfg.options : cfg.multipliers;
+};
+
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [lotSize, setLotSize] = useState(0.35); // Default Lot Size to 0.35 per user request
+  const [optionsStake, setOptionsStake] = useState(0.35);
+  const [multiplierStake, setMultiplierStake] = useState(0.01);
+  const [tradeMode, setTradeMode] = useState<'OPTIONS' | 'MULTIPLIERS'>('MULTIPLIERS');
+  const [multiplier, setMultiplier] = useState(20);
   const {
     accounts,
     selectedAccount,
@@ -57,14 +107,35 @@ const Index = () => {
   const safePositions = Array.isArray(positions) ? positions : [];
   const totalPnl = safePositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
 
+  // Reset stake to symbol-specific default when symbol or trade mode changes
+  useEffect(() => {
+    const cfg = getStakeConfig(selectedSymbol || '', tradeMode);
+    if (tradeMode === 'OPTIONS') {
+      setOptionsStake(cfg.default);
+    } else {
+      setMultiplierStake(cfg.default);
+    }
+  }, [selectedSymbol, tradeMode]);
+
   const handleManualTrade = (type: 'CALL' | 'PUT') => {
-    executeTrade({
-      symbol: selectedSymbol,
-      contract_type: type,
-      amount: lotSize,
-      duration: 1,
-      duration_unit: 'm'
-    });
+    // If Options mode, standard logic
+    if (tradeMode === 'OPTIONS') {
+      executeTrade({
+        symbol: selectedSymbol,
+        contract_type: type,
+        amount: optionsStake,
+        duration: 1,
+        duration_unit: 'm'
+      });
+    } else {
+      // If Multipliers mode, send MULTUP/MULTDOWN and multiplier
+      executeTrade({
+        symbol: selectedSymbol,
+        contract_type: type === 'CALL' ? 'MULTUP' : 'MULTDOWN',
+        amount: multiplierStake,
+        multiplier: multiplier
+      });
+    }
   };
 
   const [isBypassed, setIsBypassed] = useState(false);
@@ -184,26 +255,75 @@ const Index = () => {
                 <div className="lg:col-span-2 space-y-6">
                   {/* Manual Trade Controls */}
                   <div className="flex flex-col gap-4 p-4 bg-muted/20 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <label className="text-sm font-medium">Lot Size:</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.35"
-                        value={lotSize}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (!isNaN(val)) setLotSize(val);
-                        }}
-                        className="p-2 rounded border border-input bg-background w-24"
-                      />
+
+                    {/* Trade Mode Toggle */}
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Trade Mode:</label>
+                      <div className="flex bg-background rounded-md border border-input p-1">
+                        <button
+                          onClick={() => setTradeMode('OPTIONS')}
+                          className={cn("px-3 py-1 text-xs rounded transition-colors", tradeMode === 'OPTIONS' ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-muted text-muted-foreground")}
+                        >
+                          Options
+                        </button>
+                        <button
+                          onClick={() => setTradeMode('MULTIPLIERS')}
+                          className={cn("px-3 py-1 text-xs rounded transition-colors", tradeMode === 'MULTIPLIERS' ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-muted text-muted-foreground")}
+                        >
+                          Normal (Mult)
+                        </button>
+                      </div>
                     </div>
+
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium">
+                          {tradeMode === 'MULTIPLIERS' ? 'Volume:' : 'Stake:'}
+                        </label>
+                        <input
+                          type="number"
+                          step={getStakeConfig(selectedSymbol || '', tradeMode).step.toString()}
+                          min={getStakeConfig(selectedSymbol || '', tradeMode).min.toString()}
+                          value={tradeMode === 'MULTIPLIERS' ? multiplierStake : optionsStake}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            const cfg = getStakeConfig(selectedSymbol || '', tradeMode);
+                            if (!isNaN(val) && val >= cfg.min) {
+                              if (tradeMode === 'MULTIPLIERS') setMultiplierStake(val);
+                              else setOptionsStake(val);
+                            }
+                          }}
+                          className="p-2 rounded border border-input bg-background w-24 text-center font-mono"
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          (min: {getStakeConfig(selectedSymbol || '', tradeMode).min})
+                        </span>
+                      </div>
+
+                      {tradeMode === 'MULTIPLIERS' && (
+                        <div className="flex items-center gap-2 animate-fade-in">
+                          <label className="text-sm font-medium">Multiplier:</label>
+                          <select
+                            value={multiplier}
+                            onChange={(e) => setMultiplier(Number(e.target.value))}
+                            className="p-2 rounded border border-input bg-background w-20 font-mono"
+                          >
+                            <option value={20}>x20</option>
+                            <option value={40}>x40</option>
+                            <option value={50}>x50</option>
+                            <option value={100}>x100</option>
+                            <option value={200}>x200</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
-                      <button onClick={() => handleManualTrade('CALL')} className="px-4 py-2 bg-buy hover:bg-buy/80 text-white rounded font-bold">
-                        BUY / CALL (Up)
+                      <button onClick={() => handleManualTrade('CALL')} className="px-4 py-3 bg-buy hover:bg-buy/90 text-white rounded font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        {tradeMode === 'MULTIPLIERS' ? 'BUY (Up)' : 'CALL (Rise)'}
                       </button>
-                      <button onClick={() => handleManualTrade('PUT')} className="px-4 py-2 bg-sell hover:bg-sell/80 text-white rounded font-bold">
-                        SELL / PUT (Down)
+                      <button onClick={() => handleManualTrade('PUT')} className="px-4 py-3 bg-sell hover:bg-sell/90 text-white rounded font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]">
+                        {tradeMode === 'MULTIPLIERS' ? 'SELL (Down)' : 'PUT (Fall)'}
                       </button>
                     </div>
                   </div>

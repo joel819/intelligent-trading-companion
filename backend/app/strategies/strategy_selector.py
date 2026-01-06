@@ -165,6 +165,13 @@ def list_strategies_for_ui() -> list:
             "type": "breakout"
         },
         {
+            "symbol": "1HZ75V",
+            "name": "Volatility 75 (1s) Safe",
+            "description": "Trend-following strategy for V75 (1s)",
+            "direction": "BUY & SELL",
+            "type": "breakout"
+        },
+        {
             "symbol": "R_100",
             "name": "Volatility 100 Safe",
             "description": "Trend-following strategy for R_100",
