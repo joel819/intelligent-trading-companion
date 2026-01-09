@@ -35,18 +35,19 @@ class V75SuperSafeStrategy(BaseStrategy):
             "use_ma_trend": True,
             "ma_fast": 14,
             "ma_slow": 40,
-            "min_ma_slope": 0.001,
-            "adx_threshold": 10,
-            "sideways_slope_threshold": 0.0005,
+            "min_ma_slope": 0.0015,
+            "adx_threshold": 18,
+            "sideways_slope_threshold": 0.0008,
             
-            # Entry Logic
+            # Entry Logic (HARDENED)
             "rsi_period": 14,
-            "rsi_buy_min": 45,
-            "rsi_buy_max": 75,
-            "rsi_sell_min": 25,
-            "rsi_sell_max": 55,
+            "rsi_buy_min": 50,
+            "rsi_buy_max": 68,
+            "rsi_sell_min": 32,
+            "rsi_sell_max": 50,
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
+            "min_confidence": 70,
             
             # Risk Management (Adjusted for V75 Price ~44k - 100k)
             "sl_points_min": 50,
@@ -96,10 +97,11 @@ class V75SuperSafeStrategy(BaseStrategy):
             return None
 
         # === BUY LOGIC ===
-        if ma_trend == "bullish" or (ma_trend == "neutral" and rsi > 52):
+        if ma_trend == "bullish" or (ma_trend == "neutral" and rsi > 55):
+            # HARD BLOCK: Reject trades against H1 trend
             if mtf_trend == "bearish":
-                logger.debug(f"[V75] BUY skipped: H1 Trend Bearish")
-                # return None # Penalize but don't hard block for V75 scalping
+                logger.info(f"[V75] BUY BLOCKED: H1 Trend Bearish - Hard Entry Active")
+                return None
             
             # RSI Confirmation
             if not (self.config["rsi_buy_min"] <= rsi <= self.config["rsi_buy_max"]):
@@ -149,10 +151,11 @@ class V75SuperSafeStrategy(BaseStrategy):
             }
 
         # === SELL LOGIC ===
-        if ma_trend == "bearish" or (ma_trend == "neutral" and rsi < 48):
+        if ma_trend == "bearish" or (ma_trend == "neutral" and rsi < 45):
+            # HARD BLOCK: Reject trades against H1 trend
             if mtf_trend == "bullish":
-                logger.debug(f"[V75] SELL skipped: H1 Trend Bullish")
-                # return None 
+                logger.info(f"[V75] SELL BLOCKED: H1 Trend Bullish - Hard Entry Active")
+                return None
             
             if not (self.config["rsi_sell_min"] <= rsi <= self.config["rsi_sell_max"]):
                 return None

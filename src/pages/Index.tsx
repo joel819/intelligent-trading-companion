@@ -107,15 +107,8 @@ const Index = () => {
   const safePositions = Array.isArray(positions) ? positions : [];
   const totalPnl = safePositions.reduce((sum, pos) => sum + (pos.pnl || 0), 0);
 
-  // Reset stake to symbol-specific default when symbol or trade mode changes
-  useEffect(() => {
-    const cfg = getStakeConfig(selectedSymbol || '', tradeMode);
-    if (tradeMode === 'OPTIONS') {
-      setOptionsStake(cfg.default);
-    } else {
-      setMultiplierStake(cfg.default);
-    }
-  }, [selectedSymbol, tradeMode]);
+  // optionsStake and multiplierStake are separate state variables
+  // Each maintains its own value independently when switching modes
 
   const handleManualTrade = (type: 'CALL' | 'PUT') => {
     // If Options mode, standard logic
@@ -287,8 +280,7 @@ const Index = () => {
                           value={tradeMode === 'MULTIPLIERS' ? multiplierStake : optionsStake}
                           onChange={(e) => {
                             const val = parseFloat(e.target.value);
-                            const cfg = getStakeConfig(selectedSymbol || '', tradeMode);
-                            if (!isNaN(val) && val >= cfg.min) {
+                            if (!isNaN(val) && val >= 0) {
                               if (tradeMode === 'MULTIPLIERS') setMultiplierStake(val);
                               else setOptionsStake(val);
                             }
@@ -313,6 +305,14 @@ const Index = () => {
                             <option value={50}>x50</option>
                             <option value={100}>x100</option>
                             <option value={200}>x200</option>
+                            <option value={300}>x300</option>
+                            <option value={400}>x400</option>
+                            <option value={500}>x500</option>
+                            <option value={600}>x600</option>
+                            <option value={700}>x700</option>
+                            <option value={800}>x800</option>
+                            <option value={900}>x900</option>
+                            <option value={1000}>x1000</option>
                           </select>
                         </div>
                       )}

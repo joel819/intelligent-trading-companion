@@ -41,22 +41,23 @@ class V10SuperSafeStrategy(BaseStrategy):
             "use_ma_trend": True,
             "ma_fast": 14,
             "ma_slow": 40,
-            # Trend Filter
+            # Trend Filter (HARDENED)
             "use_ma_trend": True,
             "ma_fast": 14,
             "ma_slow": 40,
-            "min_ma_slope": 0.0002,
-            "adx_threshold": 15,
-            "sideways_slope_threshold": 0.0001,
+            "min_ma_slope": 0.0004,
+            "adx_threshold": 22,
+            "sideways_slope_threshold": 0.00015,
             
-            # Entry Logic
+            # Entry Logic (HARDENED)
             "rsi_period": 14,
-            "rsi_buy_min": 45,
-            "rsi_buy_max": 75,
-            "rsi_sell_min": 25,
-            "rsi_sell_max": 55,
+            "rsi_buy_min": 50,
+            "rsi_buy_max": 68,
+            "rsi_sell_min": 32,
+            "rsi_sell_max": 50,
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
+            "min_confidence": 70,
             
             # Risk Management
             "sl_points_min": 7,
@@ -164,12 +165,12 @@ class V10SuperSafeStrategy(BaseStrategy):
         
         if ma_trend == "bullish" and rsi_buy_min <= rsi <= rsi_buy_max:
             
-            # --- MTF FILTER (1-Hour Alignment) ---
-            # Soften: Instead of hard reject, give it a confidence penalty
-            mtf_penalty = 0
+            # --- MTF FILTER (1-Hour Alignment) - HARD BLOCK ---
             if mtf_trend == "bearish":
-                mtf_penalty = -15
-                logger.info(f"[V10] BUY Warning: H1 Trend is Bearish (-15% Penalty)")
+                reason = "BUY BLOCKED: H1 Trend Bearish - Hard Entry Active"
+                logger.info(f"[V10] {reason}")
+                return {"action": None, "reason": reason}
+            mtf_penalty = 0
             
             # --- RSI HYBRID MODE FILTER ---
             # Access the IndicatorLayer from DerivConnector (passed via engine or indicator_data)
@@ -263,11 +264,12 @@ class V10SuperSafeStrategy(BaseStrategy):
         
         if ma_trend == "bearish" and rsi_sell_min <= rsi <= rsi_sell_max:
             
-            # --- MTF FILTER (1-Hour Alignment) ---
-            mtf_penalty = 0
+            # --- MTF FILTER (1-Hour Alignment) - HARD BLOCK ---
             if mtf_trend == "bullish":
-                mtf_penalty = -15
-                logger.info(f"[V10] SELL Warning: H1 Trend is Bullish (-15% Penalty)")
+                reason = "SELL BLOCKED: H1 Trend Bullish - Hard Entry Active"
+                logger.info(f"[V10] {reason}")
+                return {"action": None, "reason": reason}
+            mtf_penalty = 0
             
             # --- RSI HYBRID MODE FILTER ---
             rsi_hybrid = None
