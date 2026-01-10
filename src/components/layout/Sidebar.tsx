@@ -11,7 +11,8 @@ import {
   History,
   BarChart3,
   CalendarDays,
-  BookOpen
+  BookOpen,
+  FlaskConical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ const navItems = [
   { id: 'positions', label: 'Positions', icon: Activity },
   { id: 'history', label: 'Trade History', icon: History },
   { id: 'journal', label: 'Trade Journal', icon: BookOpen },
+  { id: 'backtest', label: 'Backtesting', icon: FlaskConical },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'calendar', label: 'P&L Calendar', icon: CalendarDays },
   { id: 'accounts', label: 'Accounts', icon: Wallet },
