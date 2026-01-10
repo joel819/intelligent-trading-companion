@@ -11,6 +11,7 @@ import { SkippedSignalsPanel } from '@/components/dashboard/SkippedSignalsPanel'
 import { MLInsightsPanel } from '@/components/dashboard/MLInsightsPanel';
 import { TradeHistory } from '@/components/dashboard/TradeHistory';
 import { TradeJournal } from '@/components/dashboard/TradeJournal';
+import { StrategyBacktesting } from '@/components/dashboard/StrategyBacktesting';
 import { PerformanceAnalytics } from '@/components/dashboard/PerformanceAnalytics';
 import { PnLCalendar } from '@/components/dashboard/PnLCalendar';
 import { StrategySettings } from '@/components/settings/StrategySettings';
@@ -370,6 +371,12 @@ const Index = () => {
           {activeTab === 'journal' && (
             <div className="space-y-6 animate-fade-in">
               <TradeJournal />
+            </div>
+          )}
+
+          {activeTab === 'backtest' && (
+            <div className="space-y-6 animate-fade-in">
+              <StrategyBacktesting />
             </div>
           )}
 
