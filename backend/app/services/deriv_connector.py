@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import uuid
 from typing import Callable, Optional, Dict, Any, List
+from collections import defaultdict, deque
 from datetime import datetime
 from app.core.engine_wrapper import EngineWrapper
 from app.services.trade_manager import TradeManager
@@ -140,6 +141,7 @@ class DerivConnector:
         # Performance & Rate Limit Guards
         self.contracts_cache: Dict[str, Dict] = {} # {symbol: {"data": [...], "timestamp": float}}
         self.trade_lock = asyncio.Lock()
+        self.symbol_locks = defaultdict(asyncio.Lock)
         
         # Initialize C++ Engine with new JSON config
         try:
@@ -637,133 +639,142 @@ class DerivConnector:
         indicator_data = p.indicator_layer.analyze(tick_for_algo, engine=p.engine)
         structure_data = p.market_structure.analyze(tick_for_algo)
 
-        # Only process trading logic for enabled symbols
         if symbol not in self.enabled_symbols:
             return
 
         try:
-            # 4. Strategy Analysis
-            candles_1m_list = list(p.engine.candles_1m)
-            market_mode = p.engine.detect_market_mode(candles_1m_list)
+            # 3.5 Execution Lock (Prevent rapid-fire identical signals)
+            lock = self.symbol_locks[symbol]
+            if lock.locked():
+                # logger.debug(f"Execution Lock Active for {symbol} - Skipping tick")
+                return
             
-            # Run strategy
-            strategy_signal = p.strategy_manager.run_strategy(
-                symbol,
-                tick_for_algo,
-                p.engine,
-                structure_data,
-                indicator_data
-            )
-            
-            # 4. Final Validation & Execution
-            action = strategy_signal.get('action') if strategy_signal else None
-            final_confidence = strategy_signal.get('confidence', 0) if strategy_signal else 0
-            volatility_state = p.engine.get_volatility("1m")
-            
-            # Broadcast Skip if reason provided (Optimized: Throttled)
-            if strategy_signal and not action and strategy_signal.get('reason'):
-                now = time.time()
-                last_data = self.last_skipped_data.get(symbol, {"reason": "", "timestamp": 0})
+            async with lock:
+                # 4. Strategy Analysis
+                candles_1m_list = list(p.engine.candles_1m)
+                market_mode = p.engine.detect_market_mode(candles_1m_list)
                 
-                # Only broadcast if reason changed OR 10 seconds passed
-                if strategy_signal['reason'] != last_data['reason'] or (now - last_data['timestamp']) > 10.0:
-                    await stream_manager.broadcast_skipped_signal({
-                        "tick_count": p.tick_count,
-                        "reason": strategy_signal['reason'],
-                        "symbol": symbol,
-                        "atr": p.engine.get_atr("1m"),
-                        "confidence": final_confidence,
-                        "regime": market_mode,
-                        "volatility": volatility_state,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    self.last_skipped_data[symbol] = {"reason": strategy_signal['reason'], "timestamp": now}
-            
-            if action:
-                # 1. Cooldown Check
-                if not self.cooldown_manager.can_trade():
-                    logger.warning(f"[SIGNAL SKIPPED] {symbol}: Cooldown Active")
-                    await stream_manager.broadcast_skipped_signal({
-                        "tick_count": p.tick_count,
-                        "reason": "Cooldown Active",
-                        "symbol": symbol,
-                        "atr": 0, # Not relevant for cooldown
-                        "confidence": final_confidence,
-                        "regime": market_mode,
-                        "volatility": volatility_state,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    return
-
-                # 2. Risk Guard Check
-                start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
-                is_safe, guard_msg = self.risk_guard.check_trade_allowed(
-                    self.current_account.get('balance', 0.0),
-                    start_bal,
-                    len(self.open_positions),
-                    volatility_state,
-                    self.is_authorized
+                # Run strategy
+                strategy_signal = p.strategy_manager.run_strategy(
+                    symbol,
+                    tick_for_algo,
+                    p.engine,
+                    structure_data,
+                    indicator_data
                 )
                 
-                if not is_safe:
-                    logger.warning(f"[SIGNAL SKIPPED] {symbol}: Risk Guard Blocked: {guard_msg}")
-                    await stream_manager.broadcast_skipped_signal({
-                        "tick_count": p.tick_count,
-                        "reason": f"Risk Guard: {guard_msg}",
-                        "symbol": symbol,
-                        "atr": p.engine.get_atr("1m"),
-                        "confidence": final_confidence,
-                        "regime": market_mode,
-                        "volatility": volatility_state,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    return
+                # 4. Final Validation & Execution
+                action = strategy_signal.get('action') if strategy_signal else None
+                final_confidence = strategy_signal.get('confidence', 0) if strategy_signal else 0
+                volatility_state = p.engine.get_volatility("1m")
+                
+                # Broadcast Skip if reason provided (Optimized: Throttled)
+                if strategy_signal and not action and strategy_signal.get('reason'):
+                    now = time.time()
+                    last_data = self.last_skipped_data.get(symbol, {"reason": "", "timestamp": 0})
+                    
+                    # Only broadcast if reason changed OR 10 seconds passed
+                    if strategy_signal['reason'] != last_data['reason'] or (now - last_data['timestamp']) > 10.0:
+                        await stream_manager.broadcast_skipped_signal({
+                            "tick_count": p.tick_count,
+                            "reason": strategy_signal['reason'],
+                            "symbol": symbol,
+                            "atr": p.engine.get_atr("1m"),
+                            "confidence": final_confidence,
+                            "regime": market_mode,
+                            "volatility": volatility_state,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        self.last_skipped_data[symbol] = {"reason": strategy_signal['reason'], "timestamp": now}
+                
+                if action:
+                    # 1. Cooldown Check
+                    if not self.cooldown_manager.can_trade():
+                        logger.warning(f"[SIGNAL SKIPPED] {symbol}: Cooldown Active")
+                        await stream_manager.broadcast_skipped_signal({
+                            "tick_count": p.tick_count,
+                            "reason": "Cooldown Active",
+                            "symbol": symbol,
+                            "atr": 0, # Not relevant for cooldown
+                            "confidence": final_confidence,
+                            "regime": market_mode,
+                            "volatility": volatility_state,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        return
 
-                sl_price = strategy_signal.get('sl')
-                tp_price = strategy_signal.get('tp')
-                
-                # Convert distances to prices if needed
-                if sl_price is not None and sl_price < (float(bid) * 0.5):
-                     sl_price = float(bid) - sl_price if action == "BUY" else float(bid) + sl_price
-                if tp_price is not None and tp_price < (float(bid) * 0.5):
-                     tp_price = float(bid) + tp_price if action == "BUY" else float(bid) - tp_price
-                
-                # Weighted lot size
-                risk_pct = 0.5
-                stake = self.lot_calculator.calculate_lot_size(
-                    self.current_account.get('balance', 0.0),
-                    risk_pct,
-                    final_confidence,
-                    market_mode,
-                    volatility=volatility_state,
-                    symbol=symbol
+                    # 2. Risk Guard Check
+                    start_bal = getattr(self, 'start_balance', self.current_account.get('balance', 1000.0))
+                    is_safe, guard_msg = self.risk_guard.check_trade_allowed(
+                        self.current_account.get('balance', 0.0),
+                        start_bal,
+                        len(self.open_positions),
+                        volatility_state,
+                        self.is_authorized
+                    )
+                    
+                    if not is_safe:
+                        logger.warning(f"[SIGNAL SKIPPED] {symbol}: Risk Guard Blocked: {guard_msg}")
+                        await stream_manager.broadcast_skipped_signal({
+                            "tick_count": p.tick_count,
+                            "reason": f"Risk Guard: {guard_msg}",
+                            "symbol": symbol,
+                            "atr": p.engine.get_atr("1m"),
+                            "confidence": final_confidence,
+                            "regime": market_mode,
+                            "volatility": volatility_state,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        return
+
+                    sl_price = strategy_signal.get('sl')
+                    tp_price = strategy_signal.get('tp')
+                    
+                    # Convert distances to prices if needed
+                    if sl_price is not None and sl_price < (float(bid) * 0.5):
+                         sl_price = float(bid) - sl_price if action == "BUY" else float(bid) + sl_price
+                    if tp_price is not None and tp_price < (float(bid) * 0.5):
+                         tp_price = float(bid) + tp_price if action == "BUY" else float(bid) - tp_price
+                    
+                    # Weighted lot size
+                    risk_pct = 0.5
+                    stake = self.lot_calculator.calculate_lot_size(
+                        self.current_account.get('balance', 0.0),
+                        risk_pct,
+                        final_confidence,
+                        market_mode,
+                        volatility=volatility_state,
+                        symbol=symbol
+                    )
+                    
+                    # Min stake check
+                    stake = max(0.35, stake)
+
+                    # Execution
+                    await self.execute_order(symbol, action, stake, sl_price, tp_price, final_confidence, market_mode)
+                    
+                # 5. Broadcast Market Status (Always, even if no action)
+                strategy_info = p.strategy_manager.get_active_strategy_info()
+                await stream_manager.broadcast_event('market_status', {
+                    "symbol": symbol,
+                    "regime": market_mode,
+                    "volatility": volatility_state,
+                    "active_strategy": strategy_info.get("name", "Unknown"),
+                    "tick_count": p.tick_count,
+                    "spike_counter": p.engine.memory.get("spike_counter", 0),
+                    "cooldown": int(self.cooldown_manager.get_remaining_seconds())
+                })
+
+                # 6. Check for Scalper Exits
+                rsi_hybrid = p.indicator_layer.get_multi_rsi_confirmation()
+                await self.monitor_positions_for_sl_tp(
+                    float(bid), 
+                    symbol, 
+                    momentum_up=rsi_hybrid.get("momentum_up"),
+                    momentum_down=rsi_hybrid.get("momentum_down"),
+                    slope_value=rsi_hybrid.get("slope_value", 0.0), # Added slope
+                    volatility_state=volatility_state
                 )
-                
-                # Min stake check
-                stake = max(0.35, stake)
-
-                # Execution
-                await self.execute_order(symbol, action, stake, sl_price, tp_price, final_confidence, market_mode)
-                
-            # 5. Broadcast Market Status (Always, even if no action)
-            strategy_info = p.strategy_manager.get_active_strategy_info()
-            await stream_manager.broadcast_event('market_status', {
-                "symbol": symbol,
-                "regime": market_mode,
-                "volatility": volatility_state,
-                "active_strategy": strategy_info.get("name", "Unknown")
-            })
-
-            # 6. Check for Scalper Exits
-            rsi_hybrid = p.indicator_layer.get_multi_rsi_confirmation()
-            await self.monitor_positions_for_sl_tp(
-                float(bid), 
-                symbol, 
-                momentum_up=rsi_hybrid.get("momentum_up"),
-                momentum_down=rsi_hybrid.get("momentum_down"),
-                slope_value=rsi_hybrid.get("slope_value", 0.0), # Added slope
-                volatility_state=volatility_state
-            )
                 
         except Exception as e:
             logger.error(f"Error in handle_tick: {e}")
@@ -816,6 +827,9 @@ class DerivConnector:
                 "scalper_tpsl": ScalperTPSL()
             }
             
+            # Record cooldown BEFORE execution to block rapid-fire signals
+            self.cooldown_manager.record_trade()
+
             # 3. Placement
             contract_type = "CALL" if action == "BUY" else "PUT"
             buy_resp = await self.execute_buy(
@@ -824,9 +838,6 @@ class DerivConnector:
                 amount=stake,
                 metadata=metadata
             )
-            
-            # Record cooldown after successful execution
-            self.cooldown_manager.record_trade()
             
             # Activate Scalper Monitors for this specific trade
             if buy_resp and 'buy' in buy_resp and symbol in self.processors:
@@ -1038,6 +1049,40 @@ class DerivConnector:
                         self.open_positions.append(optimistic_pos)
                         await stream_manager.broadcast_event('positions', self.open_positions)
                         logger.info("Optimistic UI Update executed for new position.")
+
+                    # === AUTO-JOURNAL BOT TRADES ===
+                    try:
+                        from app.api.journal import save_entries, load_entries
+                        import uuid as uuid_mod
+                        
+                        # Use the actual spot price from proposal for the journal
+                        actual_entry_price = float(proposal_data.get('spot', entry_price))
+                        strategy_name = metadata.get('strategy', 'Unknown Bot') if metadata else 'Unknown Bot'
+                        
+                        journal_entry = {
+                            "id": str(uuid_mod.uuid4()),
+                            "tradeId": new_pos_id,
+                            "symbol": symbol,
+                            "side": 'buy' if any(kw in contract_type for kw in ['CALL', 'MULTUP', 'ACCU', 'BUY']) else 'sell',
+                            "entryPrice": actual_entry_price,
+                            "exitPrice": 0.0,  # Will be updated on close
+                            "pnl": 0.0,  # Will be updated on close
+                            "date": datetime.now().isoformat(),
+                            "notes": f"[AUTO] Bot executed {contract_type} trade. Strategy: {strategy_name}",
+                            "tags": ["Bot Trade", strategy_name],
+                            "screenshots": [],
+                            "lessons": "",
+                            "emotions": "Bot",
+                            "strategy": strategy_name
+                        }
+                        
+                        entries = load_entries()
+                        entries.append(journal_entry)
+                        save_entries(entries)
+                        logger.info(f"Auto-journaled trade: {new_pos_id} (Strategy: {strategy_name}, Spot: {actual_entry_price})")
+                    except Exception as jrnl_err:
+                        logger.warning(f"Failed to auto-journal trade: {jrnl_err}")
+                    # === END AUTO-JOURNAL ===
 
                     return {"status": "success", "data": buy_resp['buy']}
                 else:

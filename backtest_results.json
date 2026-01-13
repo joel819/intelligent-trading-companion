@@ -1,0 +1,542 @@
+[
+  {
+    "pair": "1HZ75V",
+    "strategy": "spike_bot",
+    "totalPnL": 200.28,
+    "winRate": 41.18,
+    "totalTrades": 68,
+    "profitFactor": 1.16,
+    "maxDrawdown": 5.42,
+    "status": "success"
+  },
+  {
+    "pair": "1HZ75V",
+    "strategy": "v10_safe",
+    "totalPnL": -433.55,
+    "winRate": 37.08,
+    "totalTrades": 329,
+    "profitFactor": 0.93,
+    "maxDrawdown": 10.45,
+    "status": "success"
+  },
+  {
+    "pair": "1HZ75V",
+    "strategy": "v75_super_safe",
+    "totalPnL": 792.25,
+    "winRate": 39.92,
+    "totalTrades": 258,
+    "profitFactor": 1.16,
+    "maxDrawdown": 3.33,
+    "status": "success"
+  },
+  {
+    "pair": "1HZ75V",
+    "strategy": "boom300_safe",
+    "totalPnL": -489.09,
+    "winRate": 36.09,
+    "totalTrades": 133,
+    "profitFactor": 0.81,
+    "maxDrawdown": 8.03,
+    "status": "success"
+  },
+  {
+    "pair": "1HZ75V",
+    "strategy": "crash300_safe",
+    "totalPnL": -405.99,
+    "winRate": 32.37,
+    "totalTrades": 139,
+    "profitFactor": 0.85,
+    "maxDrawdown": 7.22,
+    "status": "success"
+  },
+  {
+    "pair": "1HZ75V",
+    "strategy": "breakout",
+    "totalPnL": 611.3,
+    "winRate": 43.16,
+    "totalTrades": 190,
+    "profitFactor": 1.19,
+    "maxDrawdown": 5.8,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "spike_bot",
+    "totalPnL": 453.7,
+    "winRate": 40.23,
+    "totalTrades": 87,
+    "profitFactor": 1.29,
+    "maxDrawdown": 2.98,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "v10_safe",
+    "totalPnL": 156.15,
+    "winRate": 36.84,
+    "totalTrades": 342,
+    "profitFactor": 1.02,
+    "maxDrawdown": 8.94,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "v75_super_safe",
+    "totalPnL": -629.94,
+    "winRate": 34.65,
+    "totalTrades": 254,
+    "profitFactor": 0.87,
+    "maxDrawdown": 8.06,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "boom300_safe",
+    "totalPnL": 158.22,
+    "winRate": 35.88,
+    "totalTrades": 131,
+    "profitFactor": 1.06,
+    "maxDrawdown": 3.14,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "crash300_safe",
+    "totalPnL": -224.35,
+    "winRate": 34.92,
+    "totalTrades": 126,
+    "profitFactor": 0.91,
+    "maxDrawdown": 6.79,
+    "status": "success"
+  },
+  {
+    "pair": "R_75",
+    "strategy": "breakout",
+    "totalPnL": 10.83,
+    "winRate": 35.61,
+    "totalTrades": 205,
+    "profitFactor": 1.0,
+    "maxDrawdown": 6.52,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "spike_bot",
+    "totalPnL": -129.85,
+    "winRate": 38.96,
+    "totalTrades": 77,
+    "profitFactor": 0.55,
+    "maxDrawdown": 1.55,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "v10_safe",
+    "totalPnL": -127.19,
+    "winRate": 46.94,
+    "totalTrades": 196,
+    "profitFactor": 0.8,
+    "maxDrawdown": 1.69,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "v75_super_safe",
+    "totalPnL": -24.61,
+    "winRate": 51.49,
+    "totalTrades": 134,
+    "profitFactor": 0.94,
+    "maxDrawdown": 1.08,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "boom300_safe",
+    "totalPnL": -95.31,
+    "winRate": 50.44,
+    "totalTrades": 113,
+    "profitFactor": 0.73,
+    "maxDrawdown": 1.41,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "crash300_safe",
+    "totalPnL": 50.54,
+    "winRate": 49.06,
+    "totalTrades": 106,
+    "profitFactor": 1.16,
+    "maxDrawdown": 0.75,
+    "status": "success"
+  },
+  {
+    "pair": "R_10",
+    "strategy": "breakout",
+    "totalPnL": 148.0,
+    "winRate": 56.03,
+    "totalTrades": 141,
+    "profitFactor": 1.43,
+    "maxDrawdown": 0.56,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "spike_bot",
+    "totalPnL": -279.75,
+    "winRate": 40.24,
+    "totalTrades": 82,
+    "profitFactor": 0.76,
+    "maxDrawdown": 3.32,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "v10_safe",
+    "totalPnL": -638.12,
+    "winRate": 39.55,
+    "totalTrades": 268,
+    "profitFactor": 0.84,
+    "maxDrawdown": 10.25,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "v75_super_safe",
+    "totalPnL": -389.5,
+    "winRate": 43.96,
+    "totalTrades": 182,
+    "profitFactor": 0.84,
+    "maxDrawdown": 6.48,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "boom300_safe",
+    "totalPnL": -66.96,
+    "winRate": 42.61,
+    "totalTrades": 115,
+    "profitFactor": 0.96,
+    "maxDrawdown": 2.54,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "crash300_safe",
+    "totalPnL": 310.6,
+    "winRate": 48.76,
+    "totalTrades": 121,
+    "profitFactor": 1.18,
+    "maxDrawdown": 3.15,
+    "status": "success"
+  },
+  {
+    "pair": "R_50",
+    "strategy": "breakout",
+    "totalPnL": 30.53,
+    "winRate": 45.61,
+    "totalTrades": 171,
+    "profitFactor": 1.01,
+    "maxDrawdown": 4.24,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "spike_bot",
+    "totalPnL": -296.7,
+    "winRate": 25.88,
+    "totalTrades": 85,
+    "profitFactor": 0.85,
+    "maxDrawdown": 4.84,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "v10_safe",
+    "totalPnL": 813.78,
+    "winRate": 34.6,
+    "totalTrades": 448,
+    "profitFactor": 1.08,
+    "maxDrawdown": 9.67,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "v75_super_safe",
+    "totalPnL": -849.9,
+    "winRate": 30.13,
+    "totalTrades": 312,
+    "profitFactor": 0.88,
+    "maxDrawdown": 14.7,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "boom300_safe",
+    "totalPnL": -386.69,
+    "winRate": 29.05,
+    "totalTrades": 148,
+    "profitFactor": 0.89,
+    "maxDrawdown": 7.34,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "crash300_safe",
+    "totalPnL": 665.47,
+    "winRate": 34.13,
+    "totalTrades": 126,
+    "profitFactor": 1.24,
+    "maxDrawdown": 4.89,
+    "status": "success"
+  },
+  {
+    "pair": "R_100",
+    "strategy": "breakout",
+    "totalPnL": 12.98,
+    "winRate": 30.74,
+    "totalTrades": 257,
+    "profitFactor": 1.0,
+    "maxDrawdown": 10.08,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "spike_bot",
+    "totalPnL": -25.33,
+    "winRate": 29.31,
+    "totalTrades": 232,
+    "profitFactor": 1.0,
+    "maxDrawdown": 5.84,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "v10_safe",
+    "totalPnL": 248.88,
+    "winRate": 31.94,
+    "totalTrades": 454,
+    "profitFactor": 1.03,
+    "maxDrawdown": 11.34,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "v75_super_safe",
+    "totalPnL": -272.45,
+    "winRate": 29.82,
+    "totalTrades": 332,
+    "profitFactor": 0.96,
+    "maxDrawdown": 9.53,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "boom300_safe",
+    "totalPnL": 722.1,
+    "winRate": 42.03,
+    "totalTrades": 138,
+    "profitFactor": 1.24,
+    "maxDrawdown": 3.51,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "crash300_safe",
+    "totalPnL": 161.56,
+    "winRate": 30.94,
+    "totalTrades": 139,
+    "profitFactor": 1.06,
+    "maxDrawdown": 4.65,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM300N",
+    "strategy": "breakout",
+    "totalPnL": 230.84,
+    "winRate": 32.34,
+    "totalTrades": 235,
+    "profitFactor": 1.04,
+    "maxDrawdown": 4.8,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "spike_bot",
+    "totalPnL": 176.58,
+    "winRate": 32.71,
+    "totalTrades": 214,
+    "profitFactor": 1.04,
+    "maxDrawdown": 6.56,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "v10_safe",
+    "totalPnL": -280.61,
+    "winRate": 31.69,
+    "totalTrades": 426,
+    "profitFactor": 0.97,
+    "maxDrawdown": 14.98,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "v75_super_safe",
+    "totalPnL": 106.15,
+    "winRate": 30.57,
+    "totalTrades": 314,
+    "profitFactor": 1.02,
+    "maxDrawdown": 8.19,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "boom300_safe",
+    "totalPnL": -937.51,
+    "winRate": 24.31,
+    "totalTrades": 144,
+    "profitFactor": 0.69,
+    "maxDrawdown": 10.81,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "crash300_safe",
+    "totalPnL": 235.84,
+    "winRate": 37.5,
+    "totalTrades": 136,
+    "profitFactor": 1.08,
+    "maxDrawdown": 4.67,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH300N",
+    "strategy": "breakout",
+    "totalPnL": -460.47,
+    "winRate": 30.25,
+    "totalTrades": 238,
+    "profitFactor": 0.91,
+    "maxDrawdown": 10.27,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "spike_bot",
+    "totalPnL": -177.96,
+    "winRate": 45.14,
+    "totalTrades": 144,
+    "profitFactor": 0.87,
+    "maxDrawdown": 2.97,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "v10_safe",
+    "totalPnL": 365.02,
+    "winRate": 54.67,
+    "totalTrades": 214,
+    "profitFactor": 1.19,
+    "maxDrawdown": 2.06,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "v75_super_safe",
+    "totalPnL": -364.23,
+    "winRate": 41.77,
+    "totalTrades": 158,
+    "profitFactor": 0.78,
+    "maxDrawdown": 4.47,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "boom300_safe",
+    "totalPnL": 659.9,
+    "winRate": 64.84,
+    "totalTrades": 91,
+    "profitFactor": 2.01,
+    "maxDrawdown": 1.51,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "crash300_safe",
+    "totalPnL": -309.49,
+    "winRate": 35.87,
+    "totalTrades": 92,
+    "profitFactor": 0.68,
+    "maxDrawdown": 3.11,
+    "status": "success"
+  },
+  {
+    "pair": "BOOM500",
+    "strategy": "breakout",
+    "totalPnL": 11.01,
+    "winRate": 47.06,
+    "totalTrades": 136,
+    "profitFactor": 1.01,
+    "maxDrawdown": 2.51,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "spike_bot",
+    "totalPnL": 120.92,
+    "winRate": 49.36,
+    "totalTrades": 156,
+    "profitFactor": 1.08,
+    "maxDrawdown": 2.14,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "v10_safe",
+    "totalPnL": 53.73,
+    "winRate": 47.47,
+    "totalTrades": 217,
+    "profitFactor": 1.03,
+    "maxDrawdown": 2.66,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "v75_super_safe",
+    "totalPnL": -381.02,
+    "winRate": 44.16,
+    "totalTrades": 154,
+    "profitFactor": 0.76,
+    "maxDrawdown": 4.64,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "boom300_safe",
+    "totalPnL": -345.24,
+    "winRate": 41.75,
+    "totalTrades": 103,
+    "profitFactor": 0.68,
+    "maxDrawdown": 4.43,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "crash300_safe",
+    "totalPnL": 36.66,
+    "winRate": 52.13,
+    "totalTrades": 94,
+    "profitFactor": 1.05,
+    "maxDrawdown": 2.41,
+    "status": "success"
+  },
+  {
+    "pair": "CRASH500",
+    "strategy": "breakout",
+    "totalPnL": -22.78,
+    "winRate": 50.67,
+    "totalTrades": 150,
+    "profitFactor": 0.98,
+    "maxDrawdown": 2.78,
+    "status": "success"
+  }
+]

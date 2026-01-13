@@ -1,0 +1,2282 @@
+[
+  {
+    "id": "fae0e2ea-5831-40ac-a878-d406047d1b6f",
+    "tradeId": "71613580821",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-10T11:43:11.855966",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "69498611-adb8-4fd4-a7e6-3a8a1761bede",
+    "tradeId": "71613581661",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-10T11:43:15.278041",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "a5a08a51-d86a-4db1-9a46-6ec3709b0a9e",
+    "tradeId": "71613876381",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-10T12:06:32.307927",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "e3e522cb-72ba-4bc5-ab4b-7189b4c6f13a",
+    "tradeId": "71613876861",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-10T12:06:34.496596",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "1aa2c794-cc06-45f4-9eee-90b41cc8215e",
+    "tradeId": "71637727701",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-11T19:10:39.163987",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "e2128212-6b6d-4847-b425-98e618025b3e",
+    "tradeId": "71637772481",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-11T19:14:16.487332",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "611480b0-3be1-4bd7-bae3-856ed30e0599",
+    "tradeId": "71637772641",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-11T19:14:17.073235",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "9b71bfe2-5c21-4c19-89ef-e312eeaae91a",
+    "tradeId": "71637807161",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-11T19:17:03.984394",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "38f311e2-854f-4b75-912f-ee44e3d0f3bd",
+    "tradeId": "71654222141",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:23:15.012207",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "716a5c57-6c99-4465-9c41-f5c7c2459e07",
+    "tradeId": "71654222281",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:23:15.648274",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "d0b50d4d-0a6b-479e-892f-6516be25bf79",
+    "tradeId": "71654249861",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:25:13.517744",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "687bcca2-6aed-4815-9916-4a2d36662ff3",
+    "tradeId": "71654250041",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:25:14.004601",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "3457c445-29a9-4eb9-ac63-933c02f5ad62",
+    "tradeId": "71654295461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:28:25.884115",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "2d62ed8f-671b-4d29-b0cc-5bc62f722b74",
+    "tradeId": "71654295541",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:28:26.522256",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "b6b8cf29-ed0e-4168-b54f-bde27a81e548",
+    "tradeId": "71654319361",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:30:16.437295",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "0d4f4df9-00e5-4551-bad3-2f2ceaf014cd",
+    "tradeId": "71654319561",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:30:16.988544",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "306de943-7097-4fe3-96dc-fd4ef88d893d",
+    "tradeId": "71654566241",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:50:26.924361",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "e5716f0b-754b-4f3f-a6e2-c4691799a665",
+    "tradeId": "71654566301",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:50:27.441023",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "5d757187-f6ce-4cee-b898-5638ea1008ad",
+    "tradeId": "71654591741",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:52:25.337869",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "07c3c315-e16e-4fae-a092-1acc1a31a7b8",
+    "tradeId": "71654591841",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:52:25.823934",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "6a3da1b3-c830-426f-bf78-90812f9a8cdc",
+    "tradeId": "71654592481",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T11:52:29.186990",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "5611a3ed-90ef-4a94-aade-dea8ec013306",
+    "tradeId": "71654678441",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:00:17.725426",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "e3a4f936-5d34-4a4e-bbe3-823345133ff3",
+    "tradeId": "71654678561",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:00:18.223846",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "544abeb2-2b08-417a-8b4c-aa881764e69e",
+    "tradeId": "71654678881",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:00:19.604789",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "9f458bb2-846c-4a70-89ad-30297118609b",
+    "tradeId": "71654725941",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:04:29.083812",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "30119ce0-5e07-45e0-9be2-79c0b714bb4d",
+    "tradeId": "71654726041",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:04:29.866295",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "572f943a-0d47-4d21-8ff2-a3c17aeb2160",
+    "tradeId": "71654788241",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:09:57.877237",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "7fa8dfcf-6646-40f5-85f1-814cecf56cae",
+    "tradeId": "71654788381",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:09:58.520576",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "646cfd60-33fc-4453-9831-d6228d99b268",
+    "tradeId": "71654835861",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:14:03.933994",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "00a2e784-a06a-430e-b033-0eebcfddfa71",
+    "tradeId": "71654836001",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:14:04.575573",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "dcb69c9d-d9ba-4c1e-a944-4b93c3744817",
+    "tradeId": "71654910121",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:20:38.170012",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "19c2d750-d9ca-46e4-82c5-0cd2d61d13d9",
+    "tradeId": "71654910241",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:20:38.716246",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "878ad73b-27da-4ac3-a3a0-93472b4ae5d9",
+    "tradeId": "71654925421",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:22:07.368138",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "4e6288da-b596-4777-b68e-4a0ae1dd8713",
+    "tradeId": "71654925541",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:22:07.877203",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "ae3edbf5-0530-4292-8eae-5fbb14d54f94",
+    "tradeId": "71654939341",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:23:25.498731",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "94adf19e-729f-49d6-a093-d55dd19060bc",
+    "tradeId": "71654939481",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T12:23:26.205111",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "5a8fdf62-3c5d-484d-b6b4-53deaf7aa0b6",
+    "tradeId": "71659714941",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:40:14.699404",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "07e81117-60a2-41e9-8ce4-f88c6c2c6f2b",
+    "tradeId": "71659715141",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:40:15.405528",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "dc3147ba-1d04-46b8-bb36-f498624d6ff8",
+    "tradeId": "71659747301",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:42:44.663542",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "aa1b9a82-9144-41ec-a07d-0b56205e78bd",
+    "tradeId": "71659747501",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:42:45.186531",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "05b2091a-0ce4-429d-910e-12ce55138c50",
+    "tradeId": "71659761541",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:44:01.796658",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "76dc4fed-c059-48f9-9fe0-a3b533f18460",
+    "tradeId": "71659761661",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:44:02.578696",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "fe7a9c98-7689-4746-af63-32460808c31c",
+    "tradeId": "71659947841",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:59:00.574778",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "716d13fe-2f78-4a25-a28a-e94d491c2b25",
+    "tradeId": "71659948101",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T14:59:01.156886",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "52397ca9-ef46-4b8c-b15a-f1624f6cb0e7",
+    "tradeId": "71660150261",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:14:57.998109",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "791b198b-7aa1-4b4e-81b9-f40c5b137db1",
+    "tradeId": "71660150481",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:14:58.596822",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "318e35b5-3fbc-49b7-b3eb-e6093b1d321d",
+    "tradeId": "71660166501",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:16:05.085264",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "02acdca6-61d7-4092-b099-5ab224cea153",
+    "tradeId": "71660166721",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:16:05.699385",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "c063fac4-e2ae-4756-9258-1e66159dc5cf",
+    "tradeId": "71660166841",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:16:06.187778",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "d537d746-b904-4275-8bab-9a24e85a7617",
+    "tradeId": "71660264681",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:23:24.634191",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "90d4f60f-7f90-4658-a3b8-ee62ed4185b2",
+    "tradeId": "71660264841",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:23:25.159143",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "a7db7506-a63b-4f78-ab68-ec26f2eb0d7a",
+    "tradeId": "71660309641",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:26:49.932510",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "56467784-e011-4fd8-b189-f3d8673e1320",
+    "tradeId": "71660310021",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 0.35,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:26:50.752301",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Bot",
+    "tags": [
+      "Bot Trade",
+      "Auto"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Spike Bot"
+  },
+  {
+    "id": "da2cb287-ad11-42e7-a31c-6246583986b1",
+    "tradeId": "71660365181",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5769.4,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:31:04.550944",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "fe57db22-c5e7-4f28-b615-0afc6a81a36b",
+    "tradeId": "71660365401",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5769.38,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:31:05.108311",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "de073c11-34d9-42b1-a87d-655a23ae9cf8",
+    "tradeId": "71660529421",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5768.555,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:42:48.197527",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "d9abdad6-6a2a-40da-aa6f-44799636f4d1",
+    "tradeId": "71660529681",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5768.613,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:42:48.834137",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "efe7482f-76d2-4e7b-b6d6-6da66b0774e4",
+    "tradeId": "71660602741",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5767.586,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:48:20.861396",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "b4a17b11-36fa-430f-90d0-1168d7a643d8",
+    "tradeId": "71660602861",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5767.586,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:48:21.417924",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "21bb846d-8e97-4af1-8a75-53f6cfae3442",
+    "tradeId": "71660644381",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.497,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:51:51.010664",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "0a92dea0-c5df-4b7e-9cef-c2eeec6d1171",
+    "tradeId": "71660644501",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.497,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:51:51.592000",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "6e1996c9-bdee-46e4-aa65-cfcca49a9a29",
+    "tradeId": "71660709821",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5765.376,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:56:45.202599",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "72d2f4dc-0796-4948-8ebe-4bfe1c7db328",
+    "tradeId": "71660709921",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5765.376,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:56:45.703405",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "2ba8a3cc-0d78-4b5c-a52b-f3b20b9221b2",
+    "tradeId": "71660732641",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5766.91,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:58:23.743276",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "0acfa894-32ae-4bab-9fef-87352a90c54c",
+    "tradeId": "71660732781",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5766.91,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T15:58:24.419189",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "74e10e57-791f-4a2a-9cb6-d79fad681d59",
+    "tradeId": "71660762701",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.339,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:00:41.488723",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "375ad1bd-29da-49f5-960b-4544cf23a026",
+    "tradeId": "71660762821",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.339,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:00:41.999995",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "660d45b8-a15c-4c34-9a3e-aa01d3cf7f24",
+    "tradeId": "71660826261",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.484,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:05:10.159409",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "65234fe3-c282-4b60-9fc4-272ac41314e7",
+    "tradeId": "71660826461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5768.499,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:05:10.798565",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "c0149176-13ba-445f-9b03-32941b9636b9",
+    "tradeId": "71660902461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5769.572,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:10:16.455233",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "bfd46eea-340c-4512-b9f6-7e8642998f53",
+    "tradeId": "71660902661",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5769.654,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:10:16.957214",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "1bd04986-76c8-4da3-8d1c-c85f57c1cf48",
+    "tradeId": "71660902821",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5769.654,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:10:17.732937",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "79356354-47be-490f-a8f4-daefdc7ca145",
+    "tradeId": "71660983321",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.268,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:15:53.753315",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "51782fa6-8f42-4d27-9e7f-5c4a58bf8610",
+    "tradeId": "71660983441",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.268,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:15:54.473418",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "afb065f3-6e17-4d95-806d-a0fa8a12f19f",
+    "tradeId": "71661043101",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.03,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:20:02.937749",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "e025fcab-cb1a-4d98-9f06-5782535ad1d0",
+    "tradeId": "71661043241",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.03,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:20:03.575672",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "562ea9e8-e0fb-4ca2-8780-47b48cb15829",
+    "tradeId": "71661077441",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5772.102,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:22:18.707229",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "f4f3872e-50d4-445e-92fa-605520cc0141",
+    "tradeId": "71661077601",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.977,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:22:19.187226",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "796ded43-db96-49ba-8578-f15aa0381c61",
+    "tradeId": "71661082661",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.67,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:22:43.125760",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "68215dec-ef10-4e18-ba0a-258e2af5842a",
+    "tradeId": "71661082881",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.67,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:22:43.743651",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "f954d85a-e143-4a3c-86b7-aea9218b564b",
+    "tradeId": "71661102001",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.755,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:24:03.432929",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "a8af260f-b39d-418e-8374-60b718b6d9af",
+    "tradeId": "71661102141",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.755,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:24:03.948006",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "7594c8e5-b2e0-47ff-b41a-e08e99d7a644",
+    "tradeId": "71661102461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5771.681,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:24:05.127436",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "24070049-2ade-4f26-ab0c-4bf7b7ad4b86",
+    "tradeId": "71661137721",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5772.841,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:26:33.794996",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "5b0f701b-76d6-4589-a263-f87a7c9e7ad0",
+    "tradeId": "71661137841",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5772.841,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:26:34.604628",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "c8100ee7-6ba7-4e66-ae1c-c7227b8f9e3d",
+    "tradeId": "71661138121",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5772.745,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:26:35.097188",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "7107cb6e-e1f3-4da8-bd04-622fa47ed601",
+    "tradeId": "71661259081",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5773.242,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:34:35.968590",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "a35dcec5-f4ec-4b98-8ebd-6586c82c4efa",
+    "tradeId": "71661259941",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5773.16,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:34:39.684463",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "e4a88b1d-938f-451d-b0b5-f15f262f4908",
+    "tradeId": "71661306701",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5771.647,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:37:02.897759",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "7d9b4925-bcfc-42ed-bd13-627cb655ae29",
+    "tradeId": "71661306861",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5771.647,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:37:03.488167",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "acaac167-b811-47ec-871a-51ac2e7b7018",
+    "tradeId": "71661307081",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5771.647,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:37:03.976893",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "70553954-ab3e-4696-964f-4711c4aa150b",
+    "tradeId": "71661307201",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5771.647,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T16:37:04.603095",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "af57d411-4972-4036-ae3f-c21f1d5f93b5",
+    "tradeId": "71661986681",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5770.775,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:26:42.059527",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "2e3fe5e5-6e42-492d-b462-81c63924117d",
+    "tradeId": "71661986821",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5770.695,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:26:42.692960",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "76913d1b-795d-4cae-8ece-c4e6af623440",
+    "tradeId": "71662050321",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.16,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:31:29.209064",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "e43b4419-15dc-4051-8fad-c31b577030fb",
+    "tradeId": "71662050461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.16,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:31:29.743591",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "89b1cdeb-3053-450e-8939-017df3adb95d",
+    "tradeId": "71662050561",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5770.16,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:31:30.493734",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "75a9a8b5-d25f-4d52-b6ba-679180a2cd60",
+    "tradeId": "71662196461",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5766.593,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:41:58.749928",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "88fb3140-2e20-4e68-badd-ec79a5dd4406",
+    "tradeId": "71662196701",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5766.593,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:41:59.364945",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "065fb333-597e-40ca-a9e3-69efb464e59a",
+    "tradeId": "71662234781",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5765.511,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:45:14.253370",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "3e7d0033-c1ef-4648-a5dd-7dc7f1340df0",
+    "tradeId": "71662234861",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5765.364,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:45:14.870989",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "3716beed-0efb-486d-99d9-bcc5cec2cb07",
+    "tradeId": "71662280841",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5765.46,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:49:09.137639",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "48cacded-51de-4584-83a5-8a908bc12a0e",
+    "tradeId": "71662280981",
+    "symbol": "R_10",
+    "side": "buy",
+    "entryPrice": 5765.46,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:49:09.704757",
+    "notes": "[AUTO] Bot executed CALL trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "0c5090a0-7b38-44fa-a1a6-e9612c5c6c3b",
+    "tradeId": "71662378961",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5765.78,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:57:20.014868",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "9f381d77-2b41-48da-b119-899322528700",
+    "tradeId": "71662379041",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5765.78,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T17:57:20.667800",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "8da3e198-08cc-4475-985c-5eb59882ca1b",
+    "tradeId": "71662613961",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5760.801,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:10:07.761325",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "2942c802-b59f-443b-91ef-193c0691b2d6",
+    "tradeId": "71662614121",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5760.801,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:10:08.440046",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "7b6fd886-3de0-4fb3-b7fe-da5abd5c1812",
+    "tradeId": "71662641221",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.518,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:12:10.221533",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "ffa03c28-39bc-402b-bd2e-d2bc2ce1feb3",
+    "tradeId": "71662641441",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.237,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:12:10.841323",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "650b2b53-62de-482e-8591-ba3ade00f750",
+    "tradeId": "71662670901",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5757.601,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:14:27.775713",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "4f90b56f-c084-4064-ad80-d04f0a3d524c",
+    "tradeId": "71662670981",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5757.601,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:14:28.485719",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "c34f531f-00ff-4c16-b35e-99857d0576eb",
+    "tradeId": "71662705501",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.636,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:16:59.624229",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "567ad09a-8f59-4c16-8ca4-cbd9e36b6c9d",
+    "tradeId": "71662707321",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.464,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:17:07.986132",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "14587c2e-d291-4d77-a354-10044fa868d7",
+    "tradeId": "71662743501",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5755.899,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:20:19.657555",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "de2ac2dc-b8d5-4363-bb6e-ac9b0f40a0f0",
+    "tradeId": "71662743621",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5755.899,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:20:20.169456",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "2f241209-d0fc-4635-8145-427b66d21a6c",
+    "tradeId": "71662791161",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.872,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:24:09.668381",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "f45a08be-6a99-438c-b17d-ddfae9fd7f30",
+    "tradeId": "71662791341",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5758.872,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:24:10.230594",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "cd31fd29-1c1d-4c15-a250-f882959b215b",
+    "tradeId": "71662811541",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5757.739,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:25:51.398599",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "35d39db2-9385-4d05-81e2-3906be5ab14e",
+    "tradeId": "71662811721",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5757.739,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:25:51.912995",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  },
+  {
+    "id": "9666da39-da91-44fc-b3fb-631d8d16498b",
+    "tradeId": "71662811901",
+    "symbol": "R_10",
+    "side": "sell",
+    "entryPrice": 5757.739,
+    "exitPrice": 0.0,
+    "pnl": 0.0,
+    "date": "2026-01-12T18:25:52.536021",
+    "notes": "[AUTO] Bot executed PUT trade. Strategy: Manual Trade",
+    "tags": [
+      "Bot Trade",
+      "Manual Trade"
+    ],
+    "screenshots": [],
+    "lessons": "",
+    "emotions": "Bot",
+    "strategy": "Manual Trade"
+  }
+]

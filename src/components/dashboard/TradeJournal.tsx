@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Plus, 
-  Search, 
-  Image as ImageIcon, 
-  X, 
-  Tag, 
+import {
+  Plus,
+  Search,
+  Image as ImageIcon,
+  X,
+  Tag,
   Calendar,
   TrendingUp,
   TrendingDown,
@@ -23,22 +23,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface JournalEntry {
-  id: string;
-  tradeId: string;
-  symbol: string;
-  side: 'buy' | 'sell';
-  entryPrice: number;
-  exitPrice: number;
-  pnl: number;
-  date: Date;
-  notes: string;
-  tags: string[];
-  screenshots: string[];
-  lessons: string;
-  emotions: string;
-  strategy: string;
-}
+import { JournalEntry } from '@/types/trading';
 
 const PREDEFINED_TAGS = [
   'Trend Following',
@@ -66,45 +51,27 @@ const EMOTION_OPTIONS = [
   'Impatient'
 ];
 
-// Generate mock journal entries
-const generateMockEntries = (): JournalEntry[] => {
-  const symbols = ['Volatility 75 Index', 'Boom 300 Index', 'Crash 300 Index', 'Volatility 100 Index'];
-  const strategies = ['Spike Bot', 'Scalper', 'Breakout', 'Grid Recovery'];
-  const entries: JournalEntry[] = [];
 
-  for (let i = 0; i < 15; i++) {
-    const side = Math.random() > 0.5 ? 'buy' : 'sell';
-    const entryPrice = 1000 + Math.random() * 500;
-    const exitPrice = side === 'buy' 
-      ? entryPrice * (1 + (Math.random() - 0.4) * 0.05)
-      : entryPrice * (1 - (Math.random() - 0.4) * 0.05);
-    const pnl = side === 'buy' 
-      ? (exitPrice - entryPrice) * 10
-      : (entryPrice - exitPrice) * 10;
-
-    entries.push({
-      id: `journal-${i}`,
-      tradeId: `TRD-${1000 + i}`,
-      symbol: symbols[Math.floor(Math.random() * symbols.length)],
-      side,
-      entryPrice,
-      exitPrice,
-      pnl,
-      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-      notes: i % 3 === 0 ? 'Market showed strong momentum. Entry was well-timed after confirmation.' : '',
-      tags: PREDEFINED_TAGS.slice(0, Math.floor(Math.random() * 3) + 1),
-      screenshots: [],
-      lessons: i % 4 === 0 ? 'Wait for confirmation before entering. Patience is key.' : '',
-      emotions: EMOTION_OPTIONS[Math.floor(Math.random() * EMOTION_OPTIONS.length)],
-      strategy: strategies[Math.floor(Math.random() * strategies.length)]
-    });
-  }
-
-  return entries.sort((a, b) => b.date.getTime() - a.date.getTime());
-};
 
 export const TradeJournal = () => {
-  const [entries, setEntries] = useState<JournalEntry[]>(generateMockEntries);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+
+  // Fetch Entries
+  useEffect(() => {
+    fetch('http://localhost:8000/journal/')
+      .then(res => res.json())
+      .then(data => {
+        // Ensure dates are parsed
+        const parsed = data.map((e: any) => ({
+          ...e,
+          date: new Date(e.date)
+        }));
+        // Sort descending
+        parsed.sort((a: JournalEntry, b: JournalEntry) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setEntries(parsed);
+      })
+      .catch(err => console.error("Failed to load journal", err));
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedEmotion, setSelectedEmotion] = useState<string>('all');
@@ -175,22 +142,21 @@ export const TradeJournal = () => {
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const entryPrice = parseFloat(formData.entryPrice);
     const exitPrice = parseFloat(formData.exitPrice);
     const pnl = formData.side === 'buy'
       ? (exitPrice - entryPrice) * 10
       : (entryPrice - exitPrice) * 10;
 
-    const newEntry: JournalEntry = {
-      id: editingEntry?.id || `journal-${Date.now()}`,
-      tradeId: editingEntry?.tradeId || `TRD-${Date.now()}`,
+    const baseEntry = {
+      tradeId: editingEntry?.tradeId || ('TRD - ' + Date.now()),
       symbol: formData.symbol,
       side: formData.side,
       entryPrice,
       exitPrice,
       pnl,
-      date: editingEntry?.date || new Date(),
+      date: editingEntry?.date || new Date().toISOString(),
       notes: formData.notes,
       tags: formData.tags,
       screenshots: formData.screenshots,
@@ -199,15 +165,31 @@ export const TradeJournal = () => {
       strategy: formData.strategy
     };
 
-    if (editingEntry) {
-      setEntries(prev => prev.map(e => e.id === editingEntry.id ? newEntry : e));
-    } else {
-      setEntries(prev => [newEntry, ...prev]);
-    }
+    try {
+      if (editingEntry) {
+        const res = await fetch(`http://localhost:8000/journal/${editingEntry.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(baseEntry)
+        });
+        const updated = await res.json();
+        setEntries(prev => prev.map(e => e.id === editingEntry.id ? { ...updated, date: new Date(updated.date) } : e));
+      } else {
+        const res = await fetch('http://localhost:8000/journal/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(baseEntry)
+        });
+        const created = await res.json();
+        setEntries(prev => [{ ...created, date: new Date(created.date) }, ...prev]);
+      }
 
-    setIsAddDialogOpen(false);
-    setEditingEntry(null);
-    resetForm();
+      setIsAddDialogOpen(false);
+      setEditingEntry(null);
+      resetForm();
+    } catch (err) {
+      console.error("Failed to save entry", err);
+    }
   };
 
   const handleEdit = (entry: JournalEntry) => {
@@ -227,8 +209,13 @@ export const TradeJournal = () => {
     setIsAddDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setEntries(prev => prev.filter(e => e.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await fetch(`http://localhost:8000/journal/${id}`, { method: 'DELETE' });
+      setEntries(prev => prev.filter(e => e.id !== id));
+    } catch (err) {
+      console.error("Failed to delete entry", err);
+    }
   };
 
   const filteredEntries = useMemo(() => {
@@ -580,7 +567,7 @@ export const TradeJournal = () => {
                       </span>
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {format(entry.date, 'MMM d, yyyy')}
+                        {format(new Date(entry.date), 'MMM d, yyyy')}
                       </span>
                       {entry.strategy && (
                         <Badge variant="outline">{entry.strategy}</Badge>
@@ -624,7 +611,7 @@ export const TradeJournal = () => {
                           />
                         ))}
                         {entry.screenshots.length > 3 && (
-                          <div 
+                          <div
                             className="w-16 h-16 rounded border border-border bg-muted flex items-center justify-center cursor-pointer hover:bg-accent"
                             onClick={() => setViewingEntry(entry)}
                           >

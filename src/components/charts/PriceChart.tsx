@@ -3,7 +3,8 @@ import { createChart, ColorType, CandlestickSeries, LineSeries, LineStyle, Histo
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, TrendingDown, BarChart3, Activity, ZoomIn, ZoomOut } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, Activity, ZoomIn, ZoomOut, Timer } from 'lucide-react';
+import { useTradingContext } from '@/context/TradingContext';
 
 interface CandleData {
   time: Time;
@@ -22,6 +23,7 @@ interface PriceChartProps {
 }
 
 export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions = [] }: PriceChartProps) => {
+  const { marketStatus } = useTradingContext();
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const rsiContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -79,8 +81,9 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
       handleScroll: { mouseWheel: true, pressedMouseMove: true },
       handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
       rightPriceScale: {
-        minimumWidth: 70, // Force fixed width to align stacked charts
+        minimumWidth: 100, // Force FIXED width to align stacked charts perfectly
         visible: true,
+        borderVisible: false,
       },
     };
 
@@ -794,14 +797,29 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
                 <span className={legendData.hist >= 0 ? 'text-buy' : 'text-sell'}>HIST:</span> <span>{legendData.hist?.toFixed(4)}</span>
               </div>
             )}
+            {marketStatus && marketStatus.spike_counter !== undefined && marketStatus.spike_counter > 0 && (
+              <div className="flex items-center gap-1 text-primary border-l border-white/10 pl-3">
+                <Timer className="w-3 h-3" />
+                <span className="font-bold">TICKS: {marketStatus.spike_counter}</span>
+              </div>
+            )}
+            {marketStatus && marketStatus.cooldown !== undefined && marketStatus.cooldown > 0 && (
+              <div className="flex items-center gap-1 text-orange-400 border-l border-white/10 pl-3">
+                <Activity className="w-3 h-3 animate-pulse" />
+                <span className="font-bold">
+                  COOLDOWN: {Math.floor(marketStatus.cooldown / 60)}:{(marketStatus.cooldown % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
-        <div ref={chartContainerRef} className="w-full" style={{ height: '300px' }} />
-        <div className="border-t border-white/5 mt-1" />
-        <div ref={rsiContainerRef} className="w-full" style={{ height: '100px' }} />
-        <div className="border-t border-white/5 mt-1" />
-        <div ref={macdContainerRef} className="w-full" style={{ height: '100px' }} />
+        {/* Unified Chart Stack */}
+        <div className="flex flex-col gap-0 border border-white/5 rounded-lg overflow-hidden bg-[#0a0a0f]/40">
+          <div ref={chartContainerRef} className="w-full" style={{ height: '300px' }} />
+          <div ref={rsiContainerRef} className="w-full border-t border-white/5" style={{ height: '100px' }} />
+          <div ref={macdContainerRef} className="w-full border-t border-white/5" style={{ height: '100px' }} />
+        </div>
       </CardContent>
     </Card>
   );

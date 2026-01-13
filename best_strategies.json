@@ -1,0 +1,47 @@
+{
+  "1HZ75V": {
+    "strategy": "v75_super_safe",
+    "pnl": 792.25,
+    "winRate": 39.92
+  },
+  "R_75": {
+    "strategy": "spike_bot",
+    "pnl": 453.7,
+    "winRate": 40.23
+  },
+  "R_10": {
+    "strategy": "breakout",
+    "pnl": 148.0,
+    "winRate": 56.03
+  },
+  "R_50": {
+    "strategy": "crash300_safe",
+    "pnl": 310.6,
+    "winRate": 48.76
+  },
+  "R_100": {
+    "strategy": "v10_safe",
+    "pnl": 813.78,
+    "winRate": 34.6
+  },
+  "BOOM300N": {
+    "strategy": "boom300_safe",
+    "pnl": 722.1,
+    "winRate": 42.03
+  },
+  "CRASH300N": {
+    "strategy": "crash300_safe",
+    "pnl": 235.84,
+    "winRate": 37.5
+  },
+  "BOOM500": {
+    "strategy": "boom300_safe",
+    "pnl": 659.9,
+    "winRate": 64.84
+  },
+  "CRASH500": {
+    "strategy": "spike_bot",
+    "pnl": 120.92,
+    "winRate": 49.36
+  }
+}

@@ -28,6 +28,7 @@ async def execute_trade(request: dict):
         multiplier=multiplier,
         metadata={
             "source": "Manual", 
+            "strategy": "Manual Trade",
             "stop_loss": request.get('stop_loss'), 
             "take_profit": request.get('take_profit'),
             "user_request": request

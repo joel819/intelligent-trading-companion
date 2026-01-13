@@ -6,12 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Play, 
-  BarChart3, 
-  TrendingUp, 
-  TrendingDown, 
-  Target, 
+import {
+  Play,
+  BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Target,
   AlertTriangle,
   Calendar,
   DollarSign,
@@ -24,180 +24,33 @@ import {
 import { format, subDays, differenceInDays } from 'date-fns';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
-interface BacktestTrade {
-  id: string;
-  entryDate: Date;
-  exitDate: Date;
-  symbol: string;
-  side: 'buy' | 'sell';
-  entryPrice: number;
-  exitPrice: number;
-  pnl: number;
-  pnlPercent: number;
-}
-
-interface BacktestResult {
-  trades: BacktestTrade[];
-  equityCurve: { date: string; equity: number; drawdown: number }[];
-  metrics: {
-    totalPnL: number;
-    winRate: number;
-    profitFactor: number;
-    maxDrawdown: number;
-    sharpeRatio: number;
-    totalTrades: number;
-    winningTrades: number;
-    losingTrades: number;
-    avgWin: number;
-    avgLoss: number;
-    largestWin: number;
-    largestLoss: number;
-    avgHoldTime: number;
-    expectancy: number;
-  };
-}
+import { BacktestResult, BacktestTrade } from '@/types/trading';
 
 const STRATEGIES = [
-  { id: 'spike_bot', name: 'Spike Bot', description: 'Catches sudden price spikes' },
+  { id: 'spike_bot', name: 'Spike Bot', description: 'Volatility spike trading (V75, Boom/Crash)' },
+  { id: 'v10_safe', name: 'V10 Safe', description: 'Conservative Trend Strategy for V10' },
   { id: 'scalper', name: 'Scalper', description: 'Quick in-and-out trades' },
   { id: 'breakout', name: 'Breakout', description: 'Trades breakouts from ranges' },
   { id: 'grid_recovery', name: 'Grid Recovery', description: 'Grid-based recovery system' },
-  { id: 'v75_sniper', name: 'V75 Sniper', description: 'Optimized for Volatility 75' },
-  { id: 'boom300_safe', name: 'Boom 300 Safe', description: 'Conservative Boom 300 strategy' },
-  { id: 'crash300_safe', name: 'Crash 300 Safe', description: 'Conservative Crash 300 strategy' },
 ];
 
 const SYMBOLS = [
-  'Volatility 75 Index',
-  'Volatility 100 Index',
-  'Boom 300 Index',
-  'Crash 300 Index',
-  'Volatility 50 Index',
-  'Step Index',
+  { value: '1HZ75V', label: 'Volatility 75 (1s) Index' },
+  { value: 'R_75', label: 'Volatility 75 Index' },
+  { value: 'R_10', label: 'Volatility 10 Index' },
+  { value: 'R_100', label: 'Volatility 100 Index' },
+  { value: 'R_50', label: 'Volatility 50 Index' },
+  { value: 'BOOM300N', label: 'Boom 300 Index' },
+  { value: 'CRASH300N', label: 'Crash 300 Index' },
+  { value: 'BOOM500', label: 'Boom 500 Index' },
+  { value: 'CRASH500', label: 'Crash 500 Index' },
 ];
 
-const generateBacktestResult = (
-  strategy: string,
-  symbol: string,
-  startDate: Date,
-  endDate: Date,
-  initialBalance: number
-): BacktestResult => {
-  const days = differenceInDays(endDate, startDate);
-  const tradesPerDay = strategy === 'scalper' ? 8 : strategy === 'spike_bot' ? 3 : 5;
-  const totalTrades = Math.floor(days * tradesPerDay * (0.7 + Math.random() * 0.6));
-  
-  // Strategy-specific win rates
-  const baseWinRate = {
-    spike_bot: 0.62,
-    scalper: 0.58,
-    breakout: 0.55,
-    grid_recovery: 0.68,
-    v75_sniper: 0.60,
-    boom300_safe: 0.72,
-    crash300_safe: 0.70,
-  }[strategy] || 0.55;
 
-  const winRate = baseWinRate + (Math.random() - 0.5) * 0.1;
-  
-  const trades: BacktestTrade[] = [];
-  let equity = initialBalance;
-  const equityCurve: { date: string; equity: number; drawdown: number }[] = [];
-  let peakEquity = initialBalance;
-  let maxDrawdown = 0;
-
-  for (let i = 0; i < totalTrades; i++) {
-    const tradeDate = new Date(startDate.getTime() + Math.random() * (endDate.getTime() - startDate.getTime()));
-    const isWin = Math.random() < winRate;
-    const side = Math.random() > 0.5 ? 'buy' : 'sell';
-    const entryPrice = 1000 + Math.random() * 500;
-    const pnlPercent = isWin 
-      ? 0.5 + Math.random() * 2 
-      : -(0.3 + Math.random() * 1.5);
-    const pnl = (equity * (pnlPercent / 100));
-    const exitPrice = side === 'buy'
-      ? entryPrice * (1 + pnlPercent / 100)
-      : entryPrice * (1 - pnlPercent / 100);
-
-    trades.push({
-      id: `bt-${i}`,
-      entryDate: tradeDate,
-      exitDate: new Date(tradeDate.getTime() + (5 + Math.random() * 60) * 60000),
-      symbol,
-      side,
-      entryPrice,
-      exitPrice,
-      pnl,
-      pnlPercent,
-    });
-
-    equity += pnl;
-    peakEquity = Math.max(peakEquity, equity);
-    const currentDrawdown = ((peakEquity - equity) / peakEquity) * 100;
-    maxDrawdown = Math.max(maxDrawdown, currentDrawdown);
-  }
-
-  // Sort trades by date
-  trades.sort((a, b) => a.entryDate.getTime() - b.entryDate.getTime());
-
-  // Build equity curve
-  equity = initialBalance;
-  peakEquity = initialBalance;
-  
-  for (let d = 0; d <= days; d++) {
-    const currentDate = new Date(startDate.getTime() + d * 24 * 60 * 60 * 1000);
-    const dayTrades = trades.filter(t => 
-      format(t.entryDate, 'yyyy-MM-dd') === format(currentDate, 'yyyy-MM-dd')
-    );
-    
-    dayTrades.forEach(t => {
-      equity += t.pnl;
-    });
-    
-    peakEquity = Math.max(peakEquity, equity);
-    const drawdown = ((peakEquity - equity) / peakEquity) * 100;
-    
-    equityCurve.push({
-      date: format(currentDate, 'MMM d'),
-      equity: Math.round(equity * 100) / 100,
-      drawdown: Math.round(drawdown * 100) / 100,
-    });
-  }
-
-  // Calculate metrics
-  const winningTrades = trades.filter(t => t.pnl > 0);
-  const losingTrades = trades.filter(t => t.pnl <= 0);
-  const totalWins = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
-  const totalLosses = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
-  
-  const avgWin = winningTrades.length > 0 ? totalWins / winningTrades.length : 0;
-  const avgLoss = losingTrades.length > 0 ? totalLosses / losingTrades.length : 0;
-  
-  return {
-    trades,
-    equityCurve,
-    metrics: {
-      totalPnL: equity - initialBalance,
-      winRate: (winningTrades.length / trades.length) * 100,
-      profitFactor: totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? Infinity : 0,
-      maxDrawdown,
-      sharpeRatio: 1.2 + Math.random() * 1.5,
-      totalTrades: trades.length,
-      winningTrades: winningTrades.length,
-      losingTrades: losingTrades.length,
-      avgWin,
-      avgLoss,
-      largestWin: winningTrades.length > 0 ? Math.max(...winningTrades.map(t => t.pnl)) : 0,
-      largestLoss: losingTrades.length > 0 ? Math.min(...losingTrades.map(t => t.pnl)) : 0,
-      avgHoldTime: 15 + Math.random() * 45,
-      expectancy: (avgWin * (winningTrades.length / trades.length)) - (avgLoss * (losingTrades.length / trades.length)),
-    },
-  };
-};
 
 export const StrategyBacktesting = () => {
   const [selectedStrategy, setSelectedStrategy] = useState('spike_bot');
-  const [selectedSymbol, setSelectedSymbol] = useState('Volatility 75 Index');
+  const [selectedSymbol, setSelectedSymbol] = useState('R_75');
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [initialBalance, setInitialBalance] = useState('10000');
@@ -210,22 +63,58 @@ export const StrategyBacktesting = () => {
     setProgress(0);
     setResult(null);
 
-    // Simulate backtest progress
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      setProgress(i);
+    // Fake progress while waiting for API
+    const interval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 10, 90));
+    }, 200);
+
+    try {
+      const response = await fetch('http://localhost:8000/backtest/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategyId: selectedStrategy,
+          symbol: selectedSymbol,
+          startDate,
+          endDate,
+          initialBalance: parseFloat(initialBalance)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backtest failed: ${response.statusText}`);
+      }
+
+      const data: BacktestResult = await response.json();
+
+      // Ensure date objects for charts if needed (Recharts handles strings mostly fine, but let's be safe if logic needs it)
+      // For now, assuming strings returned by API are ISO/Compatible
+
+      // Re-map trades for date usage if necessary
+      const processedValues = {
+        ...data,
+        trades: data.trades.map(t => ({
+          ...t,
+          entryDate: new Date(t.entryDate),
+          exitDate: new Date(t.exitDate)
+        }))
+      };
+
+      // Use Type Assertion or map manually if strict mismatch on Date vs string occurs in component usage downstrem
+      // The component uses format(trade.entryDate) so we need Date objects.
+
+      // Fix Types locally for current component state usage
+      // @ts-ignore
+      setResult(processedValues);
+
+    } catch (err) {
+      console.error("Backtest error:", err);
+      // Toast notification here suggested
+    } finally {
+      clearInterval(interval);
+      setProgress(100);
+      setIsRunning(false);
     }
-
-    const backtestResult = generateBacktestResult(
-      selectedStrategy,
-      selectedSymbol,
-      new Date(startDate),
-      new Date(endDate),
-      parseFloat(initialBalance)
-    );
-
-    setResult(backtestResult);
-    setIsRunning(false);
   };
 
   const selectedStrategyInfo = STRATEGIES.find(s => s.id === selectedStrategy);
@@ -282,7 +171,7 @@ export const StrategyBacktesting = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {SYMBOLS.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -317,8 +206,8 @@ export const StrategyBacktesting = () => {
                 min="100"
               />
             </div>
-            <Button 
-              onClick={runBacktest} 
+            <Button
+              onClick={runBacktest}
               disabled={isRunning}
               className="gap-2"
             >
@@ -445,26 +334,26 @@ export const StrategyBacktesting = () => {
                       <AreaChart data={result.equityCurve}>
                         <defs>
                           <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="date" 
+                        <XAxis
+                          dataKey="date"
                           stroke="hsl(var(--muted-foreground))"
                           fontSize={12}
                           tickLine={false}
                         />
-                        <YAxis 
+                        <YAxis
                           stroke="hsl(var(--muted-foreground))"
                           fontSize={12}
                           tickLine={false}
                           tickFormatter={(value) => `$${value.toLocaleString()}`}
                         />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'hsl(var(--card))', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'hsl(var(--card))',
                             border: '1px solid hsl(var(--border))',
                             borderRadius: '8px'
                           }}
@@ -473,10 +362,10 @@ export const StrategyBacktesting = () => {
                             name === 'equity' ? 'Equity' : 'Drawdown'
                           ]}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="equity" 
-                          stroke="hsl(var(--primary))" 
+                        <Area
+                          type="monotone"
+                          dataKey="equity"
+                          stroke="hsl(var(--primary))"
                           fill="url(#equityGradient)"
                           strokeWidth={2}
                         />

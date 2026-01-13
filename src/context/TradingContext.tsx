@@ -37,6 +37,9 @@ interface TradingContextType {
         volatility: string;
         active_strategy: string;
         symbol: string;
+        tick_count?: number;
+        spike_counter?: number;
+        cooldown?: number;
     };
 }
 
@@ -60,7 +63,10 @@ export const TradingProvider = ({ children }: { children: ReactNode }) => {
         regime: 'Analyzing...',
         volatility: 'Unknown',
         active_strategy: 'Loading...',
-        symbol: selectedSymbol
+        symbol: selectedSymbol,
+        tick_count: 0,
+        spike_counter: 0,
+        cooldown: 0
     };
 
     const { showNotification } = useNotifications();
