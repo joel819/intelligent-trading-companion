@@ -29,6 +29,7 @@ const navItems = [
   { id: 'history', label: 'Trade History', icon: History },
   { id: 'journal', label: 'Trade Journal', icon: BookOpen },
   { id: 'backtest', label: 'Backtesting', icon: FlaskConical },
+  { id: 'compare', label: 'Compare', icon: BarChart3 },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'calendar', label: 'P&L Calendar', icon: CalendarDays },
   { id: 'aiChat', label: 'AI Assistant', icon: MessageSquareText },
