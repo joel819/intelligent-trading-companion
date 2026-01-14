@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Settings, 
-  Bell, 
-  Activity, 
+import {
+  LayoutDashboard,
+  Settings,
+  Bell,
+  Activity,
   Wallet,
   ChevronLeft,
   ChevronRight,
@@ -12,7 +12,8 @@ import {
   BarChart3,
   CalendarDays,
   BookOpen,
-  FlaskConical
+  FlaskConical,
+  MessageSquareText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ const navItems = [
   { id: 'backtest', label: 'Backtesting', icon: FlaskConical },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'calendar', label: 'P&L Calendar', icon: CalendarDays },
+  { id: 'aiChat', label: 'AI Assistant', icon: MessageSquareText },
   { id: 'accounts', label: 'Accounts', icon: Wallet },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'notifications', label: 'Alerts', icon: Bell },
@@ -62,7 +64,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          
+
           return (
             <button
               key={item.id}

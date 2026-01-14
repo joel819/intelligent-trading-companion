@@ -63,3 +63,7 @@ app.include_router(journal.router, prefix="/journal", tags=["Journal"])
 
 from app.api import backtest
 app.include_router(backtest.router, prefix="/backtest", tags=["Backtest"])
+
+# AI Assistant Router
+from app.api import ai
+app.include_router(ai.router, prefix="/ai", tags=["AI Assistant"])

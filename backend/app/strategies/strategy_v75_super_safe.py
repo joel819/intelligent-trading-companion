@@ -37,7 +37,7 @@ class V75SuperSafeStrategy(BaseStrategy):
             "ma_slow": 40,
             "min_ma_slope": 0.0015,
             "adx_threshold": 18,
-            "sideways_slope_threshold": 0.0008,
+            "sideways_slope_threshold": 0.0001,
             
             # Entry Logic (HARDENED)
             "rsi_period": 14,
@@ -47,7 +47,7 @@ class V75SuperSafeStrategy(BaseStrategy):
             "rsi_sell_max": 50,
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
-            "min_confidence": 70,
+            "min_confidence": 60,
             
             # Risk Management (Adjusted for V75 Price ~44k - 100k)
             "sl_points_min": 50,

@@ -14,6 +14,7 @@ import { TradeJournal } from '@/components/dashboard/TradeJournal';
 import { StrategyBacktesting } from '@/components/dashboard/StrategyBacktesting';
 import { PerformanceAnalytics } from '@/components/dashboard/PerformanceAnalytics';
 import { PnLCalendar } from '@/components/dashboard/PnLCalendar';
+import { AIChatPanel } from '@/components/dashboard/AIChatPanel';
 import { StrategySettings } from '@/components/settings/StrategySettings';
 import { StrategySelector } from '@/components/settings/StrategySelector';
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel';
@@ -63,6 +64,8 @@ const SYMBOL_STAKE_CONFIG: Record<string, { options: StakeConfig; multipliers: S
   'FRXEURUSD': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
   'FRXGBPUSD': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
   'FRXUSDJPY': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
+  // Gold
+  'frxXAUUSD': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
   // Default fallback
   'default': { options: { min: 0.35, step: 0.01, default: 0.35 }, multipliers: { min: 1.0, step: 0.01, default: 1.0 } },
 };
@@ -398,6 +401,22 @@ const Index = () => {
             <div className="space-y-6 animate-fade-in">
               <h2 className="text-xl font-semibold">Multi-Account Management</h2>
               <MultiAccountDashboard />
+            </div>
+          )}
+
+          {activeTab === 'aiChat' && (
+            <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+              <AIChatPanel
+                tradingContext={{
+                  symbol: selectedSymbol,
+                  price: ticks[selectedSymbol]?.[ticks[selectedSymbol]?.length - 1]?.price,
+                  trend: marketStatus?.regime,
+                  marketMode: marketStatus?.volatility,
+                  positions: safePositions.map(p => ({ symbol: p.symbol, pnl: p.pnl || 0, type: p.side })),
+                  skippedSignals: skippedSignals?.slice(0, 5).map(s => ({ symbol: s.symbol, reason: s.reason })),
+                  botStatus: { isRunning: botStatus.isRunning, strategy: botStatus.strategy }
+                }}
+              />
             </div>
           )}
 

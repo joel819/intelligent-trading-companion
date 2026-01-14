@@ -76,7 +76,22 @@ class DerivConnector:
         self.ws = None
         self.is_connected = False
         self.is_authorized = False
-        self.active_symbols = ["R_10", "R_100", "R_75", "R_50", "1HZ75V"] 
+        self.active_symbols = [
+            # Standard Volatility Indices
+            "R_10", "R_25", "R_50", "R_75", "R_100",
+            # 1-Second Volatility Indices
+            "1HZ10V", "1HZ25V", "1HZ50V", "1HZ75V", "1HZ100V",
+            # Boom & Crash
+            "BOOM300N", "CRASH300N", "BOOM500", "CRASH500", "BOOM1000", "CRASH1000",
+            # Jump Indices
+            "JD10", "JD25", "JD50", "JD75", "JD100",
+            # Range Break
+            "RDBULL", "RDBEAR",
+            # Forex
+            "frxEURUSD", "frxGBPUSD", "frxUSDJPY",
+            # Gold
+            "WLDXAU"
+        ]
         self.active_requests: Dict[str, asyncio.Future] = {} 
         self.listen_task: Optional[asyncio.Task] = None
         
@@ -124,7 +139,22 @@ class DerivConnector:
 
         # Symbol Processing Units
         self.processors: Dict[str, SymbolProcessor] = {}
-        self.enabled_symbols = ["R_10", "R_75", "1HZ75V"] # Both enabled by default
+        self.enabled_symbols = [
+            # Standard Volatility Indices
+            "R_10", "R_25", "R_50", "R_75", "R_100",
+            # 1-Second Volatility Indices
+            "1HZ10V", "1HZ25V", "1HZ50V", "1HZ75V", "1HZ100V",
+            # Boom & Crash
+            "BOOM300N", "CRASH300N", "BOOM500", "CRASH500", "BOOM1000", "CRASH1000",
+            # Jump Indices
+            "JD10", "JD25", "JD50", "JD75", "JD100",
+            # Range Break
+            "RDBULL", "RDBEAR",
+            # Forex
+            "frxEURUSD", "frxGBPUSD", "frxUSDJPY",
+            # Gold
+            "WLDXAU"
+        ]  # All pairs enabled
         
         # Risk & Shared Services (Shared across all pairs)
         self.lot_calculator = WeightedLotCalculator()

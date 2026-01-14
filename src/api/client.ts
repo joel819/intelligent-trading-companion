@@ -130,5 +130,33 @@ export const api = {
             if (!res.ok) throw new Error('Failed to fetch logs');
             return res.json();
         }
+    },
+    ai: {
+        chat: async (message: string, context?: Record<string, unknown>) => {
+            const res = await fetch(`${API_BASE}/ai/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, context }),
+            });
+            if (!res.ok) throw new Error('Failed to send chat message');
+            return res.json();
+        },
+        transcribe: async (audioBlob: Blob) => {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            const res = await fetch(`${API_BASE}/ai/transcribe`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!res.ok) throw new Error('Failed to transcribe audio');
+            return res.json();
+        },
+        clearHistory: async () => {
+            const res = await fetch(`${API_BASE}/ai/clear-history`, {
+                method: 'POST',
+            });
+            if (!res.ok) throw new Error('Failed to clear chat history');
+            return res.json();
+        }
     }
 };

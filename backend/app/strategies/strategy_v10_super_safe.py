@@ -46,7 +46,7 @@ class V10SuperSafeStrategy(BaseStrategy):
             "ma_fast": 14,
             "ma_slow": 40,
             "min_ma_slope": 0.0004,
-            "adx_threshold": 22,
+            "adx_threshold": 18,
             "sideways_slope_threshold": 0.00015,
             
             # Entry Logic (HARDENED)
@@ -57,7 +57,7 @@ class V10SuperSafeStrategy(BaseStrategy):
             "rsi_sell_max": 50,
             "require_macd_confirmation": True,
             "reject_wick_spikes": True,
-            "min_confidence": 70,
+            "min_confidence": 60,
             
             # Risk Management
             "sl_points_min": 7,

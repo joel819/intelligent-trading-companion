@@ -34,6 +34,10 @@ const SYMBOL_METADATA: Record<string, { label: string; category: string; icon: R
   'frxEURUSD': { label: 'EUR/USD', category: 'Forex', icon: <BarChart2 className="h-3 w-3" /> },
   'frxGBPUSD': { label: 'GBP/USD', category: 'Forex', icon: <BarChart2 className="h-3 w-3" /> },
   'frxUSDJPY': { label: 'USD/JPY', category: 'Forex', icon: <BarChart2 className="h-3 w-3" /> },
+  'frxXAUUSD': { label: 'Gold (XAU/USD)', category: 'Commodities', icon: <TrendingUp className="h-3 w-3" /> },
+  'WLDXAU': { label: 'Gold Basket', category: 'Commodities', icon: <TrendingUp className="h-3 w-3" /> },
+  'RDBULL': { label: 'Range Break Bull', category: 'Range Break', icon: <Zap className="h-3 w-3" /> },
+  'RDBEAR': { label: 'Range Break Bear', category: 'Range Break', icon: <Zap className="h-3 w-3" /> },
 };
 
 const getCategoryColor = (category: string) => {
@@ -41,15 +45,17 @@ const getCategoryColor = (category: string) => {
     case 'Synthetics': return 'bg-primary/20 text-primary';
     case 'Crash/Boom': return 'bg-warning/20 text-warning';
     case 'Jump Indices': return 'bg-success/20 text-success';
+    case 'Range Break': return 'bg-destructive/20 text-destructive';
     case 'Forex': return 'bg-muted text-muted-foreground';
+    case 'Commodities': return 'bg-yellow-500/20 text-yellow-500';
     default: return 'bg-muted text-muted-foreground';
   }
 };
 
 export const SymbolSelector = ({ symbols, selectedSymbol, onSymbolChange }: SymbolSelectorProps) => {
   // Use provided symbols or fallback to common ones
-  const displaySymbols = symbols.length > 0 
-    ? symbols 
+  const displaySymbols = symbols.length > 0
+    ? symbols
     : Object.keys(SYMBOL_METADATA).map(s => ({ symbol: s }));
 
   const getSymbolLabel = (symbol: string) => {
@@ -90,8 +96,8 @@ export const SymbolSelector = ({ symbols, selectedSymbol, onSymbolChange }: Symb
               {categorySymbols.map((symbol) => {
                 const meta = getSymbolMeta(symbol);
                 return (
-                  <SelectItem 
-                    key={symbol} 
+                  <SelectItem
+                    key={symbol}
                     value={symbol}
                     className="cursor-pointer"
                   >

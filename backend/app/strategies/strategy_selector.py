@@ -13,72 +13,154 @@ from .crash300_safe_strategy import Crash300SafeStrategy
 from .spike_bot import SpikeBotStrategy
 
 # Symbol to Strategy Class Mapping
-# Optimized based on 30-day backtest results (2026-01-10)
+# Optimized based on 30-day backtest results (2026-01-14)
+# Assignment Logic:
+#   - High volatility (V75, V100): SpikeBotStrategy or V75SuperSafe (40%+ WR, high profit)
+#   - Low volatility (V10, V25): V10SuperSafeStrategy (56%+ WR, consistent)
+#   - Boom indices: Boom300SafeStrategy (64% WR on BOOM500)
+#   - Crash indices: Crash300SafeStrategy or SpikeBotStrategy
+#   - Jump indices: SpikeBotStrategy (high volatility, spike patterns)
+#   - Range Break: V75SuperSafeStrategy (trend-following)
+#   - Forex: V10SuperSafeStrategy (trend-following, lower volatility)
+
 STRATEGY_MAP: Dict[str, Type[BaseStrategy]] = {
-    # V75 (1s) - V75 Super Safe: $792.25 profit, 39.9% WR
-    "1HZ75V": V75SuperSafeStrategy,
+    # =================== STANDARD VOLATILITY INDICES ===================
+    # R_10 - V10 Safe: $148.00 profit, 56.0% WR (HIGH WIN RATE)
+    "R_10": V10SuperSafeStrategy,
+    "R10": V10SuperSafeStrategy,
     
-    # V75 - Spike Bot: $453.70 profit, 40.2% WR
-    "R_75": SpikeBotStrategy,
-    "R75": SpikeBotStrategy,
+    # R_25 - V10 Safe (Similar to V10, smooth price action)
+    "R_25": V10SuperSafeStrategy,
+    "R25": V10SuperSafeStrategy,
     
-    # V10 - Breakout (Default SMA): $148.00 profit, 56.0% WR
-    "VOLATILITY_10": V10SuperSafeStrategy,
-    "1HZ10V": V10SuperSafeStrategy, 
-    "V10": V10SuperSafeStrategy,      
-    "R_10": V10SuperSafeStrategy,    
-    "R10": V10SuperSafeStrategy,      
-    
-    # V50 - Crash300 Safe: $310.60 profit, 48.8% WR
+    # R_50 - Crash300 Safe: $310.60 profit, 48.8% WR
     "R_50": Crash300SafeStrategy,
     "R50": Crash300SafeStrategy,
     
-    # V100 - V10 Safe: $813.78 profit, 34.6% WR
+    # R_75 - Spike Bot: $453.70 profit, 40.2% WR (HIGH PROFIT)
+    "R_75": SpikeBotStrategy,
+    "R75": SpikeBotStrategy,
+    
+    # R_100 - V10 Safe: $813.78 profit, 34.6% WR (HIGHEST PROFIT)
     "R_100": V10SuperSafeStrategy,
     "R100": V10SuperSafeStrategy,
     
+    # =================== 1-SECOND VOLATILITY INDICES ===================
+    # 1HZ10V - V10 Safe (smooth, trend-following)
+    "1HZ10V": V10SuperSafeStrategy,
+    
+    # 1HZ25V - V10 Safe (similar characteristics)
+    "1HZ25V": V10SuperSafeStrategy,
+    
+    # 1HZ50V - Crash300 Safe (medium volatility)
+    "1HZ50V": Crash300SafeStrategy,
+    
+    # 1HZ75V - V75 Super Safe: $792.25 profit, 39.9% WR (BEST FOR V75)
+    "1HZ75V": V75SuperSafeStrategy,
+    
+    # 1HZ100V - Spike Bot (high volatility, spike patterns)
+    "1HZ100V": SpikeBotStrategy,
+    
+    # =================== BOOM INDICES ===================
     # BOOM 300 - Boom300 Safe: $722.10 profit, 42.0% WR
     "BOOM300": Boom300SafeStrategy,
     "BOOM300N": Boom300SafeStrategy,
     "boom_300_safe": Boom300SafeStrategy,
     
+    # BOOM 500 - Boom300 Safe: $659.90 profit, 64.8% WR (HIGHEST WIN RATE!)
+    "BOOM_500": Boom300SafeStrategy, 
+    "BOOM500": Boom300SafeStrategy,
+    
+    # BOOM 1000 - Boom300 Safe (similar behavior, less frequent spikes)
+    "BOOM1000": Boom300SafeStrategy,
+    
+    # =================== CRASH INDICES ===================
     # CRASH 300 - Crash300 Safe: $235.84 profit, 37.5% WR
     "CRASH_300": Crash300SafeStrategy,
     "CRASH300": Crash300SafeStrategy,
     "CRASH300N": Crash300SafeStrategy,
     "crash_300_safe": Crash300SafeStrategy,
 
-    # BOOM 500 - Boom300 Safe: $659.90 profit, 64.8% WR
-    "BOOM_500": Boom300SafeStrategy, 
-    "BOOM500": Boom300SafeStrategy,
-    
-    # CRASH 500 - Spike Bot: $120.92 profit, 49.4% WR
+    # CRASH 500 - Spike Bot: $120.92 profit, 49.4% WR 
     "CRASH_500": SpikeBotStrategy, 
     "CRASH500": SpikeBotStrategy,
     
-    # Forex Pairs
+    # CRASH 1000 - Crash300 Safe (safer approach for larger spikes)
+    "CRASH1000": Crash300SafeStrategy,
+    
+    # =================== JUMP INDICES ===================
+    # Jump indices have sudden price movements - Spike Bot excels here
+    "JD10": SpikeBotStrategy,   # Jump 10
+    "JD25": SpikeBotStrategy,   # Jump 25
+    "JD50": SpikeBotStrategy,   # Jump 50
+    "JD75": SpikeBotStrategy,   # Jump 75
+    "JD100": SpikeBotStrategy,  # Jump 100
+    
+    # =================== RANGE BREAK INDICES ===================
+    # Range Break - V75 Super Safe (trend breakout patterns)
+    "RDBULL": V75SuperSafeStrategy,  # Range Break Bull
+    "RDBEAR": V75SuperSafeStrategy,  # Range Break Bear
+    
+    # =================== FOREX PAIRS ===================
+    # Forex - V10 Safe (trend-following, lower volatility)
+    "frxEURUSD": V10SuperSafeStrategy,
     "FRXEURUSD": V10SuperSafeStrategy,
+    "frxGBPUSD": V10SuperSafeStrategy,
+    "FRXGBPUSD": V10SuperSafeStrategy,
+    "frxUSDJPY": V10SuperSafeStrategy,
+    "FRXUSDJPY": V10SuperSafeStrategy,
+    
+    # =================== COMMODITIES ===================
+    # Gold - V10 Safe (trend-following)
+    "WLDXAU": V10SuperSafeStrategy,
+    "frxXAUUSD": V10SuperSafeStrategy,
+    "FRXAUUSD": V10SuperSafeStrategy,
+    
+    # =================== LEGACY ALIASES ===================
+    "VOLATILITY_10": V10SuperSafeStrategy,
+    "V10": V10SuperSafeStrategy,
+    "frxAUDUSD": V10SuperSafeStrategy,
 }
 
 # Friendly names for UI display (based on backtest optimization)
 STRATEGY_DISPLAY_NAMES: Dict[str, str] = {
-    "1HZ75V": "V75 Super Safe (Best)",
-    "VOLATILITY_10": "V10 Safe",
-    "R_10": "V10 Safe",
+    # Standard Volatility
+    "R_10": "V10 Safe (56% WR)",
     "R_25": "V10 Safe",
-    "R_50": "Crash300 Safe (Best)",
-    "R_75": "Spike Bot (Best)",
-    "R_100": "V10 Safe (Best)",
-    "BOOM300": "Boom300 Safe (Best)",
-    "BOOM300N": "Boom300 Safe (Best)",
-    "CRASH_300": "Crash300 Safe (Best)",
-    "CRASH300N": "Crash300 Safe (Best)",
-    "BOOM_500": "Boom300 Safe (Best)",
-    "BOOM500": "Boom300 Safe (Best)",
-    "CRASH_500": "Spike Bot (Best)",
-    "CRASH500": "Spike Bot (Best)",
-    "FRXEURUSD": "Forex EUR/USD Safe",
+    "R_50": "Crash300 Safe (48% WR)",
+    "R_75": "Spike Bot (High Profit)",
+    "R_100": "V10 Safe ($813 Profit)",
+    # 1-Second Volatility
+    "1HZ10V": "V10 Safe",
+    "1HZ25V": "V10 Safe",
+    "1HZ50V": "Crash300 Safe",
+    "1HZ75V": "V75 Super Safe ($792)",
+    "1HZ100V": "Spike Bot",
+    # Boom
+    "BOOM300N": "Boom300 Safe (42% WR)",
+    "BOOM500": "Boom300 Safe (64% WR!)",
+    "BOOM1000": "Boom300 Safe",
+    # Crash
+    "CRASH300N": "Crash300 Safe",
+    "CRASH500": "Spike Bot (49% WR)",
+    "CRASH1000": "Crash300 Safe",
+    # Jump
+    "JD10": "Spike Bot",
+    "JD25": "Spike Bot",
+    "JD50": "Spike Bot",
+    "JD75": "Spike Bot",
+    "JD100": "Spike Bot",
+    # Range Break
+    "RDBULL": "V75 Super Safe",
+    "RDBEAR": "V75 Super Safe",
+    # Forex
+    "frxEURUSD": "V10 Safe (Forex)",
+    "frxGBPUSD": "V10 Safe (Forex)",
+    "frxUSDJPY": "V10 Safe (Forex)",
+    # Gold
+    "WLDXAU": "V10 Safe (Gold)",
 }
+
 
 def get_strategy(symbol: str) -> BaseStrategy:
     """
@@ -216,12 +298,20 @@ def list_strategies_for_ui() -> list:
             "direction": "SELL ONLY",
             "type": "pullback"
         },
-         {
+        {
             "symbol": "CRASH500",
             "name": "Crash 500 Safe",
             "description": "BUY-only Safe Mode for Crash 500",
             "direction": "BUY ONLY",
             "type": "pullback"
+        },
+        # Forex/Commodities
+        {
+            "symbol": "WLDXAU",
+            "name": "Gold Basket",
+            "description": "Trend-following strategy for Gold",
+            "direction": "BUY & SELL",
+            "type": "breakout"
         }
     ]
 
