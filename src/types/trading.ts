@@ -109,9 +109,9 @@ export interface JournalEntry {
 
 export interface BacktestTrade {
   id: string;
-  entryDate: string;
-  exitDate: string;
-  symbol: string;
+  entryDate: Date | string;
+  exitDate: Date | string;
+  symbol?: string;
   side: 'buy' | 'sell';
   entryPrice: number;
   exitPrice: number;
@@ -137,6 +137,12 @@ export interface BacktestMetrics {
 }
 
 export interface BacktestResult {
+  strategyId?: string;
+  symbol?: string;
+  startDate?: string;
+  endDate?: string;
+  initialBalance?: number;
+  finalBalance?: number;
   trades: BacktestTrade[];
   equityCurve: { date: string; equity: number; drawdown: number }[];
   metrics: BacktestMetrics;
