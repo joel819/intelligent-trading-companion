@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,15 +15,16 @@ import {
   AlertTriangle,
   Calendar,
   DollarSign,
-  Percent,
   Activity,
   LineChart,
   History,
-  Settings2
+  Settings2,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import { format, subDays, differenceInDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-
+import { runBacktest } from '@/services/backtest/BacktestEngine';
 import { BacktestResult, BacktestTrade } from '@/types/trading';
 
 const STRATEGIES = [
@@ -57,59 +58,47 @@ export const StrategyBacktesting = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<BacktestResult | null>(null);
+  const [dataSource, setDataSource] = useState<'live' | 'mock'>('live');
 
-  const runBacktest = async () => {
+  const runBacktestHandler = async () => {
     setIsRunning(true);
     setProgress(0);
     setResult(null);
 
-    // Fake progress while waiting for API
+    // Progress animation
     const interval = setInterval(() => {
-      setProgress(prev => Math.min(prev + 10, 90));
-    }, 200);
+      setProgress(prev => Math.min(prev + 5, 90));
+    }, 100);
 
     try {
-      const response = await fetch('http://localhost:8000/backtest/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategyId: selectedStrategy,
-          symbol: selectedSymbol,
-          startDate,
-          endDate,
-          initialBalance: parseFloat(initialBalance)
-        })
+      console.log('[Backtest] Starting with real Deriv historical data...');
+      
+      const backtestResult = await runBacktest({
+        strategyId: selectedStrategy,
+        symbol: selectedSymbol,
+        startDate,
+        endDate,
+        initialBalance: parseFloat(initialBalance)
       });
 
-      if (!response.ok) {
-        throw new Error(`Backtest failed: ${response.statusText}`);
-      }
-
-      const data: BacktestResult = await response.json();
-
-      // Ensure date objects for charts if needed (Recharts handles strings mostly fine, but let's be safe if logic needs it)
-      // For now, assuming strings returned by API are ISO/Compatible
-
-      // Re-map trades for date usage if necessary
-      const processedValues = {
-        ...data,
-        trades: data.trades.map(t => ({
+      // Process dates for component usage
+      const processedResult = {
+        ...backtestResult,
+        trades: backtestResult.trades.map(t => ({
           ...t,
-          entryDate: new Date(t.entryDate),
-          exitDate: new Date(t.exitDate)
+          entryDate: typeof t.entryDate === 'string' ? new Date(t.entryDate) : t.entryDate,
+          exitDate: typeof t.exitDate === 'string' ? new Date(t.exitDate) : t.exitDate
         }))
       };
 
-      // Use Type Assertion or map manually if strict mismatch on Date vs string occurs in component usage downstrem
-      // The component uses format(trade.entryDate) so we need Date objects.
-
-      // Fix Types locally for current component state usage
+      setDataSource(backtestResult.trades.length > 0 && !backtestResult.trades[0].id.startsWith('mock') ? 'live' : 'mock');
       // @ts-ignore
-      setResult(processedValues);
-
+      setResult(processedResult);
+      console.log(`[Backtest] Completed with ${backtestResult.trades.length} trades`);
+      
     } catch (err) {
       console.error("Backtest error:", err);
-      // Toast notification here suggested
+      setDataSource('mock');
     } finally {
       clearInterval(interval);
       setProgress(100);
@@ -128,7 +117,15 @@ export const StrategyBacktesting = () => {
             <BarChart3 className="w-6 h-6 text-primary" />
             Strategy Backtesting
           </h2>
-          <p className="text-muted-foreground">Test strategies against historical data</p>
+          <p className="text-muted-foreground flex items-center gap-2">
+            Test strategies against historical data
+            {result && (
+              <Badge variant={dataSource === 'live' ? 'default' : 'secondary'} className="text-xs gap-1">
+                {dataSource === 'live' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                {dataSource === 'live' ? 'Live Deriv Data' : 'Simulated Data'}
+              </Badge>
+            )}
+          </p>
         </div>
       </div>
 
@@ -207,7 +204,7 @@ export const StrategyBacktesting = () => {
               />
             </div>
             <Button
-              onClick={runBacktest}
+              onClick={runBacktestHandler}
               disabled={isRunning}
               className="gap-2"
             >

@@ -17,12 +17,13 @@ import {
   DollarSign,
   Activity,
   GitCompare,
-  X,
   Trophy,
-  Medal
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
+import { runBacktest } from '@/services/backtest/BacktestEngine';
 import { BacktestResult } from '@/types/trading';
 
 const STRATEGIES = [
@@ -66,6 +67,7 @@ export const StrategyComparison = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState<ComparisonResult[]>([]);
+  const [dataSource, setDataSource] = useState<'live' | 'mock'>('live');
 
   const toggleStrategy = (strategyId: string) => {
     setSelectedStrategies(prev =>
@@ -84,27 +86,26 @@ export const StrategyComparison = () => {
 
     const comparisonResults: ComparisonResult[] = [];
     const totalStrategies = selectedStrategies.length;
+    let usedLiveData = false;
 
     for (let i = 0; i < selectedStrategies.length; i++) {
       const strategyId = selectedStrategies[i];
       const strategy = STRATEGIES.find(s => s.id === strategyId)!;
       
       try {
-        const response = await fetch('http://localhost:8000/backtest/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            strategyId,
-            symbol: selectedSymbol,
-            startDate,
-            endDate,
-            initialBalance: parseFloat(initialBalance)
-          })
-        });
-
-        if (!response.ok) throw new Error('Backtest failed');
+        console.log(`[Comparison] Running backtest for ${strategy.name}...`);
         
-        const result: BacktestResult = await response.json();
+        const result = await runBacktest({
+          strategyId,
+          symbol: selectedSymbol,
+          startDate,
+          endDate,
+          initialBalance: parseFloat(initialBalance)
+        });
+        
+        if (result.trades.length > 0 && !result.trades[0].id.startsWith('mock')) {
+          usedLiveData = true;
+        }
         
         comparisonResults.push({
           strategyId,
@@ -112,6 +113,8 @@ export const StrategyComparison = () => {
           color: strategy.color,
           result
         });
+        
+        console.log(`[Comparison] ${strategy.name}: ${result.trades.length} trades, P&L: $${result.metrics.totalPnL.toFixed(2)}`);
       } catch (err) {
         console.error(`Error running backtest for ${strategyId}:`, err);
       }
@@ -119,6 +122,7 @@ export const StrategyComparison = () => {
       setProgress(Math.round(((i + 1) / totalStrategies) * 100));
     }
 
+    setDataSource(usedLiveData ? 'live' : 'mock');
     setResults(comparisonResults);
     setIsRunning(false);
   };
@@ -191,7 +195,15 @@ export const StrategyComparison = () => {
             <GitCompare className="w-6 h-6 text-primary" />
             Strategy Comparison
           </h2>
-          <p className="text-muted-foreground">Compare multiple strategies side-by-side</p>
+          <p className="text-muted-foreground flex items-center gap-2">
+            Compare multiple strategies side-by-side
+            {results.length > 0 && (
+              <Badge variant={dataSource === 'live' ? 'default' : 'secondary'} className="text-xs gap-1">
+                {dataSource === 'live' ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                {dataSource === 'live' ? 'Live Deriv Data' : 'Simulated Data'}
+              </Badge>
+            )}
+          </p>
         </div>
       </div>
 
