@@ -12,6 +12,7 @@ import { MLInsightsPanel } from '@/components/dashboard/MLInsightsPanel';
 import { TradeHistory } from '@/components/dashboard/TradeHistory';
 import { TradeJournal } from '@/components/dashboard/TradeJournal';
 import { StrategyBacktesting } from '@/components/dashboard/StrategyBacktesting';
+import { StrategyComparison } from '@/components/dashboard/StrategyComparison';
 import { PerformanceAnalytics } from '@/components/dashboard/PerformanceAnalytics';
 import { PnLCalendar } from '@/components/dashboard/PnLCalendar';
 import { AIChatPanel } from '@/components/dashboard/AIChatPanel';
@@ -380,6 +381,12 @@ const Index = () => {
           {activeTab === 'backtest' && (
             <div className="space-y-6 animate-fade-in">
               <StrategyBacktesting />
+            </div>
+          )}
+
+          {activeTab === 'compare' && (
+            <div className="space-y-6 animate-fade-in">
+              <StrategyComparison />
             </div>
           )}
 
