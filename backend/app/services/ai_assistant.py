@@ -13,8 +13,19 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Lazy initialization of OpenAI client
+_client = None
+
+def get_openai_client():
+    """Get OpenAI client with lazy initialization."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not found in environment. AI features will be limited.")
+            return None
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 SYSTEM_PROMPT = """You are an AI trading assistant for an Intelligent Trading Companion platform.
 You help users understand their trading bot's decisions, analyze market conditions, and provide trading insights.
@@ -69,7 +80,11 @@ class AIAssistant:
                 self.conversation_history = self.conversation_history[-20:]
             
             # Call OpenAI API
-            response = client.chat.completions.create(
+            openai_client = get_openai_client()
+            if openai_client is None:
+                return "AI features are not available. Please set the OPENAI_API_KEY environment variable."
+            
+            response = openai_client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},

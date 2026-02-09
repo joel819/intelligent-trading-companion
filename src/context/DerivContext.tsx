@@ -62,6 +62,8 @@ export const DerivProvider = ({ children }: { children: ReactNode }) => {
                 const parsed = JSON.parse(saved);
                 setAccountsMetadata(parsed);
 
+                // Prioritize Demo account for practice
+                const demoAcc = parsed.find((acc: any) => acc.type === 'demo');
                 // Prioritize Real account if exists and no preference saved
                 const realAcc = parsed.find((acc: any) => acc.type === 'real' || acc.type === 'live');
                 const lastReal = localStorage.getItem('last_real_account_id');

@@ -124,6 +124,7 @@ async def run_backtest(request: BacktestRequest):
         for col in numeric_cols:
             df[col] = df[col].astype(float)
             
+        df['sma_10'] = df['close'].rolling(window=10).mean()
         df['sma_20'] = df['close'].rolling(window=20).mean()
         df['std_20'] = df['close'].rolling(window=20).std()
         
@@ -218,6 +219,34 @@ async def run_backtest(request: BacktestRequest):
                 elif request.strategyId == "crash300_safe":
                     if row['close'] > row['sma_20'] and row['rsi'] < 50:
                         signal = "buy"
+
+                elif request.strategyId == "scalper":
+                    # Scalper: 3 consecutive candles
+                    if i > 2:
+                        prev1 = df.iloc[i-1]
+                        prev2 = df.iloc[i-2]
+                        if row['close'] > prev1['close'] and prev1['close'] > prev2['close']:
+                            signal = "buy"
+                        elif row['close'] < prev1['close'] and prev1['close'] < prev2['close']:
+                            signal = "sell"
+
+                elif request.strategyId == "breakout":
+                    # Breakout: 20 candle high/low
+                    if i > 20:
+                        lookback = df.iloc[i-20:i]
+                        high_20 = lookback['high'].max()
+                        low_20 = lookback['low'].min()
+                        if row['close'] > high_20:
+                            signal = "buy"
+                        elif row['close'] < low_20:
+                            signal = "sell"
+
+                elif request.strategyId == "grid_recovery":
+                    # Grid Recovery: Mean Reversion (0.5% deviation from SMA10)
+                    if not pd.isna(row['sma_10']):
+                         deviation = (row['close'] - row['sma_10']) / row['sma_10']
+                         if deviation < -0.005: signal = "buy"
+                         elif deviation > 0.005: signal = "sell"
 
                 else:
                      # Default SMA Crossover

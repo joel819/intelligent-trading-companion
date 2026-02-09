@@ -13,8 +13,19 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Lazy initialization of OpenAI client
+_client = None
+
+def get_openai_client():
+    """Get OpenAI client with lazy initialization."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY not found. Speech recognition will not work.")
+            return None
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 
 async def transcribe_audio(audio_data: bytes, filename: str = "audio.webm") -> str:
@@ -29,6 +40,10 @@ async def transcribe_audio(audio_data: bytes, filename: str = "audio.webm") -> s
         Transcribed text string
     """
     try:
+        client = get_openai_client()
+        if client is None:
+            raise Exception("OPENAI_API_KEY not configured. Speech recognition is not available.")
+        
         # Create a temporary file to store the audio
         suffix = os.path.splitext(filename)[1] if filename else ".webm"
         

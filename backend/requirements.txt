@@ -5,3 +5,6 @@ websockets
 python-dotenv
 sse-starlette
 openai
+numpy
+pandas
+python-multipart

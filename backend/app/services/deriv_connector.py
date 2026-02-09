@@ -63,12 +63,11 @@ load_dotenv()
 
 class DerivConnector:
     def __init__(self, token: str = None, app_id: str = "118882"):
-        # Prioritize Real credentials for initial lock
         real_token = os.getenv("DERIV_REAL_TOKEN")
         real_app_id = os.getenv("DERIV_REAL_APP_ID", "118882")
         
         self.token = token or real_token or os.getenv("DERIV_TOKEN")
-        self.app_id = app_id or real_app_id or os.getenv("DERIV_APP_ID", "118882")
+        self.app_id = app_id or real_app_id or os.getenv("DERIV_APP_ID") or "118882"
         
         if not self.token:
             logger.warning("No DERIV_TOKEN or DERIV_REAL_TOKEN found in environment.")
@@ -108,19 +107,8 @@ class DerivConnector:
             
         real_token = os.getenv("DERIV_REAL_TOKEN")
         if real_token:
-            # Map the known Real Account ID to this token
-            self.account_tokens["CR6512853"] = real_token
-            # Also add to available accounts so it appears in the list even before first auth
-            self.available_accounts.append({
-                "id": "CR6512853",
-                "name": "Deriv USD Real",
-                "type": "real",
-                "currency": "USD",
-                "balance": 0.0,
-                "equity": 0.0,
-                "isActive": False,
-                "token": real_token
-            })
+            # We don't hardcode accounts anymore, they will be fetched via authorize or provided via switch
+            pass
 
         self.current_account: Dict = {}
         self.open_positions: List[Dict] = []
@@ -1082,7 +1070,7 @@ class DerivConnector:
 
                     # === AUTO-JOURNAL BOT TRADES ===
                     try:
-                        from app.api.journal import save_entries, load_entries
+                        from app.api.journal import add_journal_entry
                         import uuid as uuid_mod
                         
                         # Use the actual spot price from proposal for the journal
@@ -1106,9 +1094,7 @@ class DerivConnector:
                             "strategy": strategy_name
                         }
                         
-                        entries = load_entries()
-                        entries.append(journal_entry)
-                        save_entries(entries)
+                        add_journal_entry(journal_entry)
                         logger.info(f"Auto-journaled trade: {new_pos_id} (Strategy: {strategy_name}, Spot: {actual_entry_price})")
                     except Exception as jrnl_err:
                         logger.warning(f"Failed to auto-journal trade: {jrnl_err}")
@@ -1440,6 +1426,25 @@ class DerivConnector:
                 "level": "success" if profit >= 0 else "error",
                 "source": "Execution"
             })
+            
+            # === UPDATE JOURNAL ENTRY ON TRADE CLOSE ===
+            try:
+                from app.api.journal import update_journal_entry_by_trade_id
+                
+                exit_price = float(contract.get('exit_tick') or contract.get('sell_spot') or contract.get('current_spot') or 0)
+                
+                update_data = {
+                    'exitPrice': exit_price,
+                    'pnl': profit
+                }
+                
+                if update_journal_entry_by_trade_id(cid, update_data):
+                    logger.info(f"Updated journal entry for trade {cid}: Exit={exit_price}, PnL={profit}")
+                else:
+                    logger.debug(f"No journal entry found for trade {cid} to update.")
+            except Exception as jrnl_err:
+                logger.warning(f"Failed to update journal entry on close: {jrnl_err}")
+            # === END UPDATE JOURNAL ===
                 
         await stream_manager.broadcast_event('positions', self.open_positions)
 

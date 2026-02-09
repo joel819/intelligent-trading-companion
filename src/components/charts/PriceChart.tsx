@@ -65,8 +65,8 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
         textColor: 'rgba(255, 255, 255, 0.9)',
       },
       grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
       },
       crosshair: {
         mode: 0,
@@ -198,6 +198,15 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
     });
 
     rsiSeries.createPriceLine({
+      price: 50,
+      color: 'rgba(255, 255, 255, 0.3)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      title: '50',
+    });
+
+    rsiSeries.createPriceLine({
       price: 30,
       color: 'rgba(34, 197, 94, 0.7)',
       lineWidth: 1,
@@ -225,6 +234,15 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
       lastValueVisible: true,
       priceFormat: { type: 'custom', formatter: (p: number) => p.toFixed(4) },
     }) as ISeriesApi<"Histogram">;
+
+    macdSeries.createPriceLine({
+      price: 0,
+      color: 'rgba(255, 255, 255, 0.3)',
+      lineWidth: 1,
+      lineStyle: LineStyle.Solid,
+      axisLabelVisible: true,
+      title: '0',
+    });
 
     // Handle Resize
     const handleResize = () => {
@@ -509,7 +527,7 @@ export const PriceChart = ({ symbol = 'R_100', className, ticks = [], positions 
   useEffect(() => {
     if (ticks.length === 0 || !candleSeriesRef.current) return;
     const lastTick = ticks[0];
-    if (lastTick.symbol !== symbol) return;
+    // Note: Symbol check removed - ticks are pre-filtered by Index.tsx
 
     const tickTime = Math.floor(new Date(lastTick.timestamp).getTime() / 1000);
     const granMap: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600 };

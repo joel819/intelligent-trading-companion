@@ -7,10 +7,15 @@ import uuid
 import logging
 from datetime import datetime
 
+import fcntl
+from contextlib import contextmanager
+
 router = APIRouter()
 logger = logging.getLogger("api_journal")
 
-DATA_FILE = "data/journal_entries.json"
+# Resolve DATA_FILE relative to this script for consistency
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+DATA_FILE = os.path.join(BASE_DIR, "data/journal_entries.json")
 
 # Ensure data directory exists
 os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
@@ -50,19 +55,74 @@ class JournalEntry(BaseModel):
             }
         }
 
-def load_entries():
+@contextmanager
+def locked_journal(mode="r"):
+    """Context manager for locked access to the journal file."""
+    # Ensure file exists for reading
     if not os.path.exists(DATA_FILE):
-        return []
+        with open(DATA_FILE, "w") as f:
+            json.dump([], f)
+    
+    # Use a separate lock file to avoid issues with truncating the data file
+    lock_file = DATA_FILE + ".lock"
+    with open(lock_file, "w") as lf:
+        if mode == "r":
+            fcntl.flock(lf, fcntl.LOCK_SH)
+        else:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            
+        try:
+            with open(DATA_FILE, mode) as f:
+                yield f
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
+
+def load_entries():
     try:
-        with open(DATA_FILE, "r") as f:
+        with locked_journal("r") as f:
             return json.load(f)
     except Exception as e:
         logger.error(f"Failed to load journal: {e}")
         return []
 
 def save_entries(entries):
-    with open(DATA_FILE, "w") as f:
-        json.dump(entries, f, indent=2)
+    try:
+        with locked_journal("w") as f:
+            json.dump(entries, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save journal: {e}")
+
+def add_journal_entry(entry_data):
+    """Atomically add a new journal entry."""
+    try:
+        with locked_journal("r+") as f:
+            entries = json.load(f)
+            entries.insert(0, entry_data)
+            f.seek(0)
+            f.truncate()
+            json.dump(entries, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to add journal entry: {e}")
+
+def update_journal_entry_by_trade_id(trade_id, update_data):
+    """Atomically update a journal entry by its trade ID."""
+    try:
+        with locked_journal("r+") as f:
+            entries = json.load(f)
+            updated = False
+            for entry in entries:
+                if str(entry.get('tradeId')) == str(trade_id):
+                    entry.update(update_data)
+                    updated = True
+                    break
+            if updated:
+                f.seek(0)
+                f.truncate()
+                json.dump(entries, f, indent=2)
+            return updated
+    except Exception as e:
+        logger.error(f"Failed to update journal entry: {e}")
+        return False
 
 @router.get("/", response_model=List[JournalEntry])
 async def get_entries():
@@ -70,41 +130,57 @@ async def get_entries():
 
 @router.post("/", response_model=JournalEntry)
 async def create_entry(entry: JournalEntry):
-    entries = load_entries()
-    
-    new_entry = entry.dict()
-    new_entry["id"] = str(uuid.uuid4())
-    # Ensure date is string if passed as object (though Pydantic handles this usually)
-    if not isinstance(new_entry["date"], str):
-         new_entry["date"] = new_entry["date"].isoformat()
+    with locked_journal("r+") as f:
+        entries = json.load(f)
+        
+        new_entry = entry.dict()
+        new_entry["id"] = str(uuid.uuid4())
+        # Ensure date is string
+        if not isinstance(new_entry["date"], str):
+             new_entry["date"] = new_entry["date"].isoformat()
 
-    entries.insert(0, new_entry) # Add to top
-    save_entries(entries)
-    return new_entry
+        entries.insert(0, new_entry) # Add to top
+        
+        f.seek(0)
+        f.truncate()
+        json.dump(entries, f, indent=2)
+        return new_entry
 
 @router.put("/{entry_id}", response_model=JournalEntry)
 async def update_entry(entry_id: str, updated_entry: JournalEntry):
-    entries = load_entries()
-    
-    for i, entry in enumerate(entries):
-        if entry["id"] == entry_id:
-            # Preserve ID
-            data = updated_entry.dict()
-            data["id"] = entry_id
-            entries[i] = data
-            save_entries(entries)
-            return data
+    with locked_journal("r+") as f:
+        entries = json.load(f)
+        
+        found = False
+        data = None
+        for i, entry in enumerate(entries):
+            if entry["id"] == entry_id:
+                # Preserve ID
+                data = updated_entry.dict()
+                data["id"] = entry_id
+                entries[i] = data
+                found = True
+                break
+        
+        if not found:
+            raise HTTPException(status_code=404, detail="Entry not found")
             
-    raise HTTPException(status_code=404, detail="Entry not found")
+        f.seek(0)
+        f.truncate()
+        json.dump(entries, f, indent=2)
+        return data
 
 @router.delete("/{entry_id}")
 async def delete_entry(entry_id: str):
-    entries = load_entries()
-    initial_len = len(entries)
-    entries = [e for e in entries if e["id"] != entry_id]
-    
-    if len(entries) == initial_len:
-        raise HTTPException(status_code=404, detail="Entry not found")
+    with locked_journal("r+") as f:
+        entries = json.load(f)
+        initial_len = len(entries)
+        entries = [e for e in entries if e["id"] != entry_id]
         
-    save_entries(entries)
-    return {"status": "success", "message": "Entry deleted"}
+        if len(entries) == initial_len:
+            raise HTTPException(status_code=404, detail="Entry not found")
+            
+        f.seek(0)
+        f.truncate()
+        json.dump(entries, f, indent=2)
+        return {"status": "success", "message": "Entry deleted"}

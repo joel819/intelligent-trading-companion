@@ -19,6 +19,9 @@ export default defineConfig(({ mode }) => ({
         ws: true,
       },
     },
+    watch: {
+      ignored: ['**/.venv/**', '**/backend/**'],
+    },
   },
   plugins: [react()].filter(Boolean),
   resolve: {

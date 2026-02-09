@@ -158,5 +158,19 @@ export const api = {
             if (!res.ok) throw new Error('Failed to clear chat history');
             return res.json();
         }
+    },
+    backtest: {
+        run: async (config: any) => {
+            const res = await fetch(`${API_BASE}/backtest/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config),
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Backtest failed');
+            }
+            return res.json();
+        }
     }
 };

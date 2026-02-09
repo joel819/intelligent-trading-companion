@@ -53,9 +53,9 @@ app.include_router(ml.router, prefix="/ml", tags=["Machine Learning"])
 from app.api import strategies
 app.include_router(strategies.router, prefix="/strategies", tags=["Strategies"])
 
-@app.get("/")
-async def root():
-    return {"message": "ML Inference Service Operational"}
+# @app.get("/")
+# async def root():
+#     return {"message": "ML Inference Service Operational"}
 
 # New Features
 from app.api import journal

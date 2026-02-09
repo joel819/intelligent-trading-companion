@@ -107,6 +107,14 @@ export interface JournalEntry {
   strategy: string;
 }
 
+export interface BacktestConfig {
+  strategyId: string;
+  symbol: string;
+  startDate: string;
+  endDate: string;
+  initialBalance: number;
+}
+
 export interface BacktestTrade {
   id: string;
   entryDate: Date | string;
